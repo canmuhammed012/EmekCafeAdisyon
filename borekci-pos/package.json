@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -96,13 +96,6 @@
       "deleteAppDataOnUninstall": false,
       "include": "electron/installer.nsh",
       "warningsAsErrors": false
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "canmuhammed012",
-        "repo": "EmekCafeAdisyon"
-      }
-    ]
+    }
   }
 }
