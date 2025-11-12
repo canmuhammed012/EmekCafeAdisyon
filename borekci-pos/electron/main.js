@@ -13,19 +13,31 @@ function createWindow() {
   const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
+  const { scaleFactor } = primaryDisplay;
   
-  // Pencere boyutunu ekran boyutuna göre ayarla (90% kullan)
-  const windowWidth = Math.min(1400, Math.floor(width * 0.9));
-  const windowHeight = Math.min(900, Math.floor(height * 0.9));
+  // Pencere boyutunu ekran boyutuna göre ayarla
+  // Küçük ekranlar için daha fazla alan kullan, büyük ekranlar için maksimum sınır
+  const windowWidth = Math.min(1920, Math.max(1024, Math.floor(width * 0.95)));
+  const windowHeight = Math.min(1080, Math.max(768, Math.floor(height * 0.95)));
+  
+  // Minimum boyutları ekran boyutuna göre ayarla
+  const minWidth = Math.max(800, Math.floor(width * 0.6));
+  const minHeight = Math.max(600, Math.floor(height * 0.6));
+  
+  // Icon path'i belirle
+  const iconPath = app.isPackaged 
+    ? path.join(process.resourcesPath, 'public', 'logo.png')
+    : path.join(__dirname, '..', 'public', 'logo.png');
   
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
-    minWidth: 800,
-    minHeight: 600,
+    minWidth: minWidth,
+    minHeight: minHeight,
     frame: true, // Çerçeveyi göster (kapatma, küçültme butonları için)
     titleBarStyle: 'default', // Windows için varsayılan
     autoHideMenuBar: true, // Menü çubuğunu gizle
+    icon: iconPath, // Pencere icon'u
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -87,18 +99,13 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // Production - DOSYADAN YÜKLE (HTTP değil!)
-    showLoading();
+    // Production - Frontend'i hemen yükle, backend paralel başlasın
+    loadFrontendFromFile();
     
-    // Backend'i başlat (API için)
-    setTimeout(() => {
-      startBackend();
-    }, 500);
-    
-    // Frontend'i dosyadan yükle (backend hazır olmasını bekleme)
-    setTimeout(() => {
-      loadFrontendFromFile();
-    }, 2000);
+    // Backend'i paralel başlat (frontend'i bekletme)
+    startBackend().catch((err) => {
+      console.error('Backend başlatma hatası:', err);
+    });
   }
   
   // Production'da reload'u engelle
@@ -283,19 +290,144 @@ app.whenReady().then(() => {
 
 // Auto-updater ayarları (sadece production'da)
 if (app.isPackaged) {
-  autoUpdater.checkForUpdatesAndNotify();
-  
-  autoUpdater.on('update-available', () => {
-    console.log('🔄 Güncelleme mevcut');
+  // Auto-updater yapılandırması
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'canmuhammed012',
+    repo: 'EmekCafeAdisyon'
   });
   
-  autoUpdater.on('update-downloaded', () => {
-    console.log('✅ Güncelleme indirildi, yeniden başlatılıyor...');
-    autoUpdater.quitAndInstall();
+  // Auto-updater cache konumunu logla
+  console.log('📁 Auto-updater cache konumu:', autoUpdater.downloadedUpdateHelperCacheDirName);
+  console.log('📁 App userData:', app.getPath('userData'));
+  console.log('📁 App temp:', app.getPath('temp'));
+  console.log('📁 App appData:', app.getPath('appData'));
+  console.log('📁 LocalAppData (tahmini):', path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater'));
+  
+  // Veritabanı konumunu göster
+  const dbPath = path.join(app.getPath('userData'), 'emekcafe.db');
+  console.log('📁 VERİTABANI KONUMU:');
+  console.log('   Klasör:', app.getPath('userData'));
+  console.log('   Dosya:', dbPath);
+  console.log('   Tam yol:', path.resolve(dbPath));
+  // Veritabanı dosyasının var olup olmadığını kontrol et
+  try {
+    if (fs.existsSync(dbPath)) {
+      const stats = fs.statSync(dbPath);
+      console.log('   ✓ Veritabanı mevcut');
+      console.log('   📊 Boyut:', (stats.size / 1024).toFixed(2), 'KB');
+    } else {
+      console.log('   ✗ Veritabanı henüz oluşturulmamış (ilk çalıştırmada oluşturulacak)');
+    }
+  } catch (e) {
+    console.log('   ? Kontrol edilemedi:', e.message);
+  }
+  
+  // Güncelleme kontrolü - uygulama açıldıktan 5 saniye sonra (app.whenReady zaten çağrıldı)
+  setTimeout(() => {
+    console.log('🔍 Güncelleme kontrol ediliyor...');
+    console.log('📡 Feed URL:', autoUpdater.getFeedURL());
+    autoUpdater.checkForUpdates();
+  }, 5000);
+  
+  // Her 30 dakikada bir kontrol et
+  setInterval(() => {
+    console.log('🔍 Güncelleme kontrol ediliyor (periyodik)...');
+    autoUpdater.checkForUpdates();
+  }, 30 * 60 * 1000); // 30 dakika
+  
+  autoUpdater.on('checking-for-update', () => {
+    console.log('🔍 Güncelleme kontrol ediliyor...');
+  });
+  
+  autoUpdater.on('update-available', (info) => {
+    console.log('🔄 Güncelleme mevcut:', info.version);
+    console.log('📦 Güncelleme bilgileri:', JSON.stringify(info, null, 2));
+    console.log('📥 Auto-updater cache dir:', autoUpdater.downloadedUpdateHelperCacheDirName);
+    // Windows'ta genellikle şu konumlar kullanılır:
+    const possiblePaths = [
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('userData'), '..', 'Programs', 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('temp'), 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('appData'), 'emek-cafe-adisyon-updater')
+    ];
+    console.log('📁 Olası indirme konumları:');
+    possiblePaths.forEach((p, i) => {
+      console.log(`  ${i + 1}. ${p}`);
+      try {
+        if (fs.existsSync(p)) {
+          console.log(`     ✓ Klasör mevcut`);
+        } else {
+          console.log(`     ✗ Klasör yok`);
+        }
+      } catch (e) {
+        console.log(`     ? Kontrol edilemedi`);
+      }
+    });
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info.version);
+    }
+  });
+  
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('✅ Güncel sürüm kullanılıyor:', info.version);
+  });
+  
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = "İndiriliyor: " + progressObj.percent + "%";
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    console.log(log_message);
+    // İndirme konumunu göster
+    const downloadPath = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater');
+    console.log('📁 İndirme konumu:', downloadPath);
+    if (fs.existsSync(downloadPath)) {
+      console.log('📁 Klasör içeriği:', fs.readdirSync(downloadPath));
+    }
+    if (mainWindow) {
+      mainWindow.webContents.send('download-progress', progressObj);
+    }
+  });
+  
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('✅ Güncelleme indirildi:', info.version);
+    console.log('📦 İndirilen güncelleme bilgileri:', JSON.stringify(info, null, 2));
+    
+    // İndirme konumunu göster - tüm olası konumları kontrol et
+    const possiblePaths = [
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('userData'), '..', 'Programs', 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('temp'), 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('appData'), 'emek-cafe-adisyon-updater'),
+      path.join(app.getPath('userData'), 'updates')
+    ];
+    
+    console.log('📁 Güncelleme dosyası konumları kontrol ediliyor:');
+    possiblePaths.forEach((p, i) => {
+      const fullPath = path.resolve(p);
+      console.log(`  ${i + 1}. ${fullPath}`);
+      try {
+        if (fs.existsSync(fullPath)) {
+          console.log(`     ✓ Klasör mevcut`);
+          const files = fs.readdirSync(fullPath);
+          console.log(`     📄 Dosyalar:`, files);
+        } else {
+          console.log(`     ✗ Klasör yok`);
+        }
+      } catch (e) {
+        console.log(`     ? Hata:`, e.message);
+      }
+    });
+    
+    if (mainWindow) {
+      mainWindow.webContents.send('update-downloaded', info.version);
+    }
+    // Kullanıcıya sor - otomatik yükleme yerine
+    // autoUpdater.quitAndInstall();
   });
   
   autoUpdater.on('error', (error) => {
-    console.error('❌ Güncelleme hatası:', error);
+    console.error('❌ Güncelleme hatası:', error.message);
+    console.error('❌ Hata detayları:', error);
   });
 }
 

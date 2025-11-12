@@ -576,26 +576,26 @@ const Admin = ({ user }) => {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
       <div className="flex-1 pt-4">
         {/* Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-4 mx-4 flex justify-between items-center">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 mb-4 mx-2 sm:mx-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
           <div>
             <button
               onClick={() => navigate('/')}
-              className="text-blue-600 hover:text-blue-800 mb-3 text-lg font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition"
+              className="text-blue-600 hover:text-blue-800 mb-2 sm:mb-3 text-sm sm:text-base md:text-lg font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition"
             >
               ← Ana Sayfa
             </button>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Yönetim Paneli</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 dark:text-white">Yönetim Paneli</h1>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-4 mx-4">
-          <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-4 mx-2 sm:mx-4">
+          <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
             {['categories', 'products', 'tables', 'report'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-8 py-5 font-bold text-lg transition ${
+                className={`px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 font-bold text-sm sm:text-base md:text-lg transition whitespace-nowrap ${
                   activeTab === tab
                     ? 'border-b-4 border-blue-600 text-blue-600'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white'
@@ -609,17 +609,17 @@ const Admin = ({ user }) => {
             ))}
           </div>
 
-          <div className="p-6 relative z-10">
+          <div className="p-3 sm:p-4 md:p-6 relative z-10">
             {/* Categories Tab */}
             {activeTab === 'categories' && (
               <div>
-                <form onSubmit={handleCategorySubmit} className="mb-6 flex gap-3">
+                <form onSubmit={handleCategorySubmit} className="mb-4 sm:mb-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <input
                     type="text"
                     placeholder="Kategori Adı"
                     value={categoryForm.name}
                     onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                    className="flex-1 px-6 py-4 border rounded-lg dark:bg-gray-700 dark:text-white text-lg relative z-10"
+                    className="flex-1 px-4 sm:px-6 py-3 sm:py-4 border rounded-lg dark:bg-gray-700 dark:text-white text-sm sm:text-base md:text-lg relative z-10"
                     required
                     autoComplete="off"
                   />
@@ -628,12 +628,12 @@ const Admin = ({ user }) => {
                       type="color"
                       value={categoryForm.color}
                       onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
-                      className="w-24 h-14"
+                      className="w-20 sm:w-24 h-12 sm:h-14"
                     />
                   )}
                   <button
                     type="submit"
-                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-lg"
+                    className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm sm:text-base md:text-lg"
                   >
                     {editingId ? 'Güncelle' : 'Ekle'}
                   </button>
@@ -644,17 +644,17 @@ const Admin = ({ user }) => {
                         setEditingId(null);
                         setCategoryForm({ name: '', color: '#3B82F6' });
                       }}
-                      className="px-8 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-lg"
+                      className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm sm:text-base md:text-lg"
                     >
                       İptal
                     </button>
                   )}
                 </form>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {categories.map((category) => (
                     <div
                       key={category.id}
-                      className="p-5 border rounded-lg dark:bg-gray-700"
+                      className="p-3 sm:p-4 md:p-5 border rounded-lg dark:bg-gray-700"
                       style={{ borderLeftColor: category.color, borderLeftWidth: '6px' }}
                     >
                       <h3 className="font-bold text-gray-800 dark:text-white mb-3 text-lg">

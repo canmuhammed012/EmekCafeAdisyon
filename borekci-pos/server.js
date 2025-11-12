@@ -815,6 +815,11 @@ app.get('/api/receipt/:tableId', (req, res) => {
 });
 
 // Sunucu bilgilerini getir
+// Health check endpoint - Backend hazır mı kontrolü için
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Backend is ready' });
+});
+
 app.get('/api/server/info', (req, res) => {
   res.json({
     ip: networkIP,

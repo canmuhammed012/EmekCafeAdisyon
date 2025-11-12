@@ -48,16 +48,8 @@ jobs:
         
         if (Test-Path $exePath) {
           $fileSize = (Get-Item $exePath).Length
-          $content = @"
-version: $version
-files:
-  - url: $exeFile
-    sha512: placeholder
-    size: $fileSize
-path: $exeFile
-sha512: placeholder
-releaseDate: $(Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ")
-"@
+          $releaseDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
+          $content = "version: $version`nfiles:`n  - url: $exeFile`n    sha512: placeholder`n    size: $fileSize`npath: $exeFile`nsha512: placeholder`nreleaseDate: $releaseDate"
           $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
           Write-Host "✓ latest.yml oluşturuldu: $latestYml"
           Get-Content $latestYml

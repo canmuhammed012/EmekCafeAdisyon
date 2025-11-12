@@ -262,8 +262,8 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, en üste kadar */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 min-w-[200px] sm:min-w-[240px] md:min-w-[280px] self-start flex-shrink-0 overflow-y-auto max-h-[calc(100vh-100px)]">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4 text-gray-800 dark:text-white">Kategoriler</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 min-w-[150px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[240px] xl:min-w-[280px] self-start flex-shrink-0 overflow-y-auto max-h-[calc(100vh-80px)] sm:max-h-[calc(100vh-100px)]">
+            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white">Kategoriler</h2>
             <div className="flex flex-col gap-2 sm:gap-4">
               {categories.map((category) => {
                 // Hex rengi RGB'ye çevir
@@ -447,9 +447,9 @@ const TableDetail = ({ user }) => {
               </div>
             </div>
 
-            {/* Sağ taraf - Siparişler (Dikey Liste) */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 min-w-[200px] sm:min-w-[240px] md:min-w-[280px] lg:min-w-[320px] flex-shrink-0 flex flex-col overflow-hidden">
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4 text-gray-800 dark:text-white flex-shrink-0">Siparişler</h2>
+                 {/* Sağ taraf - Siparişler (Dikey Liste) */}
+                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 min-w-[150px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[240px] xl:min-w-[280px] 2xl:min-w-[320px] flex-shrink-0 flex flex-col overflow-hidden">
+                   <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white flex-shrink-0">Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400 py-6 text-sm sm:text-base">
                   Henüz sipariş yok

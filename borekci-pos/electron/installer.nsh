@@ -3,7 +3,7 @@
 
 ; Kurulum sonrası section (otomatik çalışır)
 Section -Post
-  ; Startup klasörüne kısayol ekle
+  ; Startup klasörüne kısayol ekle (icon ile)
   CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0
   
   ; Registry'ye startup entry ekle (daha güvenilir)

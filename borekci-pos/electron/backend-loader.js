@@ -17,8 +17,12 @@ function startBackend() {
       
       // Veritabanı yolu - userData kullan (ASAR dışında)
       const { app } = require('electron');
-      const dbPath = path.join(app.getPath('userData'), 'emekcafe.db');
-      console.log('📁 Veritabanı ayarlanıyor:', dbPath);
+      const userDataPath = app.getPath('userData');
+      const dbPath = path.join(userDataPath, 'emekcafe.db');
+      console.log('📁 Veritabanı konumu:');
+      console.log('   UserData klasörü:', userDataPath);
+      console.log('   Veritabanı dosyası:', dbPath);
+      console.log('   Tam yol:', path.resolve(dbPath));
       
       // Environment variables
       process.env.NODE_ENV = 'production';
@@ -38,11 +42,33 @@ function startBackend() {
         require(serverModulePath);
         serverStarted = true;
         
-        // Biraz bekle, sonra resolve et
-        setTimeout(() => {
-          console.log('✓ Backend loader tamamlandı\n');
-          resolve();
-        }, 1000);
+        // Backend hazır olana kadar bekle (HTTP isteği ile kontrol et)
+        const http = require('http');
+        let checkCount = 0;
+        const maxChecks = 50; // Maksimum 5 saniye (50 * 100ms)
+        
+        const checkBackend = setInterval(() => {
+          checkCount++;
+          const req = http.get('http://localhost:3000/api/health', { timeout: 200 }, (res) => {
+            if (res.statusCode === 200) {
+              // Backend hazır!
+              clearInterval(checkBackend);
+              console.log('✓ Backend hazır (API: http://localhost:3000)\n');
+              resolve();
+            }
+          });
+          req.on('error', () => {
+            // Henüz hazır değil, tekrar dene
+            if (checkCount >= maxChecks) {
+              clearInterval(checkBackend);
+              console.log('⚠ Backend başlatıldı (timeout - frontend devam edecek)\n');
+              resolve(); // Timeout olsa bile resolve et, frontend çalışabilir
+            }
+          });
+          req.on('timeout', () => {
+            req.destroy();
+          });
+        }, 100); // Her 100ms'de bir kontrol et
       } catch (requireError) {
         console.error('Server require hatası:', requireError);
         console.error('Stack:', requireError.stack);
