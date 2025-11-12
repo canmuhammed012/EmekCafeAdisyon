@@ -38,9 +38,16 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          ## Version ${{ github.ref_name }}
+          
+          Otomatik güncelleme için bu release'i kullanın.
         files: |
           borekci-pos/release/*.exe
           borekci-pos/release/*.exe.blockmap
+          borekci-pos/release/latest.yml
         draft: false
         prerelease: false
       env:
