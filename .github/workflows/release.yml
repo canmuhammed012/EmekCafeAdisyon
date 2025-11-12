@@ -21,19 +21,24 @@ jobs:
       run: npm ci
       working-directory: ./borekci-pos
     
-    - name: Build application
-      run: npm run build:electron
-      working-directory: ./borekci-pos
+    - name: Build application with publish
+      run: |
+        cd borekci-pos
+        npm run build
+        npx electron-builder --publish always
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-files
-        path: |
-          borekci-pos/release/*.exe
-          borekci-pos/release/*.exe.blockmap
+    - name: List release files
+      run: |
+        echo "Release klasörü içeriği:"
+        if (Test-Path "borekci-pos\release") {
+          Get-ChildItem -Path "borekci-pos\release" -Recurse | Select-Object FullName, Length
+        } else {
+          Write-Host "Release klasörü bulunamadı!"
+        }
+      shell: powershell
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -47,9 +52,10 @@ jobs:
         files: |
           borekci-pos/release/*.exe
           borekci-pos/release/*.exe.blockmap
-          borekci-pos/release/latest.yml
+          borekci-pos/release/*.yml
         draft: false
         prerelease: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
