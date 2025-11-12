@@ -38,6 +38,35 @@ jobs:
         }
       shell: powershell
     
+    - name: Create latest.yml for auto-updater
+      run: |
+        $releasePath = "borekci-pos\release"
+        $version = "${{ github.ref_name }}".Replace("v", "")
+        $exeFile = "Emek Cafe Adisyon Setup $version.exe"
+        $exePath = Join-Path $releasePath $exeFile
+        $latestYml = Join-Path $releasePath "latest.yml"
+        
+        if (Test-Path $exePath) {
+          $fileSize = (Get-Item $exePath).Length
+          $content = @"
+version: $version
+files:
+  - url: $exeFile
+    sha512: placeholder
+    size: $fileSize
+path: $exeFile
+sha512: placeholder
+releaseDate: $(Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ")
+"@
+          $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
+          Write-Host "✓ latest.yml oluşturuldu: $latestYml"
+          Get-Content $latestYml
+        } else {
+          Write-Host "⚠ Exe dosyası bulunamadı: $exePath"
+        }
+      shell: powershell
+      continue-on-error: true
+    
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
