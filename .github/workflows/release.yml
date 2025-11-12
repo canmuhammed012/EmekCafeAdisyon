@@ -21,11 +21,9 @@ jobs:
       run: npm ci
       working-directory: ./borekci-pos
     
-    - name: Build application with publish
-      run: |
-        cd borekci-pos
-        npm run build
-        npx electron-builder --publish always
+    - name: Build application
+      run: npm run build:electron
+      working-directory: ./borekci-pos
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
