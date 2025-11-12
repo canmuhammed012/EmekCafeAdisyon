@@ -30,11 +30,11 @@ jobs:
     
     - name: List release files
       run: |
-        echo "Release klasörü içeriği:"
+        echo "Release folder contents:"
         if (Test-Path "borekci-pos\release") {
           Get-ChildItem -Path "borekci-pos\release" -Recurse | Select-Object FullName, Length
         } else {
-          Write-Host "Release klasörü bulunamadı!"
+          Write-Host "Release folder not found!"
         }
       shell: powershell
     
