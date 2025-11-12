@@ -8,7 +8,7 @@
     "dev:server": "node server.js",
     "dev:vite": "vite",
     "build": "vite build",
-    "build:electron": "npm run build && electron-builder",
+    "build:electron": "npm run build && electron-builder --publish never",
     "electron": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
