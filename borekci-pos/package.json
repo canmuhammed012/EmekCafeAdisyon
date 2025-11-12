@@ -1,0 +1,104 @@
+{
+  "name": "emek-cafe-adisyon",
+  "version": "1.0.1",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:server": "node server.js",
+    "dev:vite": "vite",
+    "build": "vite build",
+    "build:electron": "npm run build && electron-builder",
+    "electron": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "pos",
+    "restaurant",
+    "adisyon",
+    "electron"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Emek Cafe Adisyon - Restoran POS yazılımı",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "electron-updater": "^6.6.2",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
+    "express": "^5.1.0",
+    "node-printer": "^1.0.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.5",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "sqlite3": "^5.1.7",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.1.2",
+    "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.0",
+    "vite": "^6.4.1",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.emekcafe.adisyon",
+    "productName": "Emek Cafe Adisyon",
+    "icon": "public/logo.png",
+    "directories": {
+      "output": "release"
+    },
+    "forceCodeSigning": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/sqlite3/**/*",
+      "**/node_modules/usb/**/*",
+      "dist/**/*"
+    ],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server.js",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "electron/installer.nsh",
+      "warningsAsErrors": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "canmuhammed012",
+      "repo": "EmekCafeAdisyon"
+    }
+  }
+}
