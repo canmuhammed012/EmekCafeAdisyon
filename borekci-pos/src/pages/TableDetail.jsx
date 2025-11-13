@@ -267,7 +267,7 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 220px)' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 220px)' }}>
             <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
               {categories.map((category) => {
@@ -323,9 +323,9 @@ const TableDetail = ({ user }) => {
           </div>
 
                  {/* Orta ve Sağ taraf - Ürünler ve Siparişler */}
-                 <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden">
+                 <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-[calc(100vh-120px)]">
                    {/* Orta - Header ve Ürünler */}
-                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden">
+                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-full">
                      {/* Header */}
                      <div className="bg-white dark:bg-gray-800 shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
                        <div>
@@ -383,7 +383,7 @@ const TableDetail = ({ user }) => {
                      </div>
 
               {/* Products Grid */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col lg:max-h-full" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
                 <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Ürünler</h2>
                      {menuLoading ? (
                        <div className="text-center py-8 text-gray-600 dark:text-gray-400">Yükleniyor...</div>
@@ -395,9 +395,10 @@ const TableDetail = ({ user }) => {
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
                          gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(120px, 12vw, 180px), 1fr))',
                          gap: 'clamp(0.375rem, 0.8vw, 0.75rem)',
-                         gridAutoRows: 'auto',
+                         gridAutoRows: 'min-content',
                          padding: '0.25rem',
-                         justifyContent: 'start'
+                         justifyContent: 'start',
+                         alignContent: 'start'
                        }}>
                 {products.map((product) => {
                   // Seçili kategorinin rengini bul
@@ -507,8 +508,8 @@ const TableDetail = ({ user }) => {
               </div>
             </div>
 
-            {/* Sağ taraf - Siparişler (Dikey Liste) */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(160px, 16vw, 230px)' }}>
+            {/* Sağ taraf - Siparişler (Dikey Liste) - İçeriğine göre uzayabilir */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden max-h-[300px] lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(160px, 16vw, 230px)' }}>
               <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.95rem, 1.3vw, 1.25rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400" style={{ padding: 'clamp(1rem, 2vw, 1.5rem)', fontSize: 'clamp(0.75rem, 1vw, 0.875rem)' }}>
