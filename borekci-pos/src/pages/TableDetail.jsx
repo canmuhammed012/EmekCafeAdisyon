@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables } from '../services/api';
+import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, printReceipt } from '../services/api';
 import { getExchangeRates, convertWithDiscount } from '../services/currency';
 import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import Footer from '../components/Footer';
@@ -270,6 +270,19 @@ const TableDetail = ({ user }) => {
     navigate('/');
   };
 
+  const handlePrintReceipt = async () => {
+    try {
+      const response = await printReceipt(parseInt(id), 0);
+      if (response.data.success) {
+        alert('✅ ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('Fiş yazdırma hatası:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Fiş yazdırılamadı';
+      alert('❌ ' + errorMessage);
+    }
+  };
+
   // Masa değiştirme fonksiyonu
   const handleTableTransfer = async (toTableId) => {
     try {
@@ -380,63 +393,80 @@ const TableDetail = ({ user }) => {
                    {/* Orta - Header ve Ürünler - %20 daraltıldı */}
                    <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ flexBasis: 'auto', minWidth: 0, maxWidth: '80%', height: '100%' }}>
                      {/* Header */}
-                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
-                       <div className="flex flex-col gap-2">
-                         <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
+                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3 flex-shrink-0">
+                       {/* Üst satır: Başlık ve Masa Değiştir */}
+                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                         <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-800 dark:text-white">
                            Masa {id} - Siparişler
                          </h1>
                          {orders.length > 0 && (
                            <button
                              onClick={handleOpenTableTransferModal}
-                             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-2 px-3 sm:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
+                             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
                            >
                              <span>🔄</span>
                              <span>Masa Değiştir</span>
                            </button>
                          )}
                        </div>
-                       <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
-                         {orders.length > 0 && (
-                           <div className="flex gap-2 sm:gap-3">
-                             <button
-                               onClick={() => handlePayment('Nakit')}
-                               className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
-                             >
-                               <span className="text-base sm:text-lg md:text-xl">💵</span>
-                               <span className="hidden sm:inline">Nakit ile Kapat</span>
-                               <span className="sm:hidden">Nakit</span>
-                             </button>
-                             <button
-                               onClick={() => handlePayment('Kart')}
-                               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
-                             >
-                               <span className="text-base sm:text-lg md:text-xl">💳</span>
-                               <span className="hidden sm:inline">Kart ile Kapat</span>
-                               <span className="sm:hidden">Kart</span>
-                             </button>
-                           </div>
-                         )}
-                         <button
-                           onClick={() => navigate('/')}
-                           className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm md:text-base lg:text-lg"
-                         >
-                           Tamamla
-                         </button>
-                         <div className="text-right ml-auto">
-                           <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
+                       
+                       {/* Alt satır: Butonlar ve Fiyat/Kur bilgileri */}
+                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 w-full">
+                         {/* Butonlar */}
+                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                           {orders.length > 0 && (
+                             <>
+                               <button
+                                 onClick={handlePrintReceipt}
+                                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
+                                 title="Fiş Yazdır"
+                               >
+                                 <span className="text-sm sm:text-base">🖨️</span>
+                                 <span className="hidden sm:inline">Fiş Yazdır</span>
+                                 <span className="sm:hidden">Fiş</span>
+                               </button>
+                               <button
+                                 onClick={() => handlePayment('Nakit')}
+                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               >
+                                 <span className="text-sm sm:text-base">💵</span>
+                                 <span className="hidden sm:inline">Nakit ile Kapat</span>
+                                 <span className="sm:hidden">Nakit</span>
+                               </button>
+                               <button
+                                 onClick={() => handlePayment('Kart')}
+                                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               >
+                                 <span className="text-sm sm:text-base">💳</span>
+                                 <span className="hidden sm:inline">Kart ile Kapat</span>
+                                 <span className="sm:hidden">Kart</span>
+                               </button>
+                             </>
+                           )}
+                           <button
+                             onClick={() => navigate('/')}
+                             className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                           >
+                             Tamamla
+                           </button>
+                         </div>
+                         
+                         {/* Fiyat ve Kur bilgileri */}
+                         <div className="text-right w-full sm:w-auto sm:ml-auto min-w-[140px] sm:min-w-[160px] flex-shrink-0">
+                           <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                              {total.toFixed(2)} ₺
                            </p>
                            {exchangeRates.USD > 0 && exchangeRates.EUR > 0 && total > 0 && (
-                             <div className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 space-y-0.5 sm:space-y-1">
-                               <p className="flex items-center justify-end gap-1 sm:gap-2">
-                                 <span>💵 Dolar:</span>
+                             <div className="mt-0.5 sm:mt-1 text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+                               <p className="flex items-center justify-end gap-1 whitespace-nowrap">
+                                 <span>💵</span>
                                  <span className="font-semibold">${convertWithDiscount(total, exchangeRates.USD).toFixed(2)}</span>
-                                 <span className="text-xs hidden sm:inline">({(exchangeRates.USD - 2).toFixed(2)} ₺)</span>
+                                 <span className="text-[10px] hidden sm:inline">({(exchangeRates.USD - 2).toFixed(2)} ₺)</span>
                                </p>
-                               <p className="flex items-center justify-end gap-1 sm:gap-2">
-                                 <span>💶 Euro:</span>
+                               <p className="flex items-center justify-end gap-1 whitespace-nowrap">
+                                 <span>💶</span>
                                  <span className="font-semibold">€{convertWithDiscount(total, exchangeRates.EUR).toFixed(2)}</span>
-                                 <span className="text-xs hidden sm:inline">({(exchangeRates.EUR - 2).toFixed(2)} ₺)</span>
+                                 <span className="text-[10px] hidden sm:inline">({(exchangeRates.EUR - 2).toFixed(2)} ₺)</span>
                                </p>
                              </div>
                            )}

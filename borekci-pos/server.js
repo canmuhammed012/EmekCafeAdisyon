@@ -5,6 +5,8 @@ const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const os = require('os');
+const escpos = require('escpos');
+const escposUSB = require('escpos-usb');
 
 const app = express();
 const server = http.createServer(app);
@@ -941,6 +943,153 @@ app.get('/api/receipt/:tableId', (req, res) => {
           date: new Date().toLocaleString('tr-TR')
         };
         res.json(receipt);
+      });
+    });
+  });
+});
+
+// USB yazıcıları listele
+app.get('/api/printers', (req, res) => {
+  try {
+    const printerList = [];
+    
+    // USB yazıcıları bul
+    const usbDevices = escposUSB.find();
+    
+    if (usbDevices && usbDevices.length > 0) {
+      usbDevices.forEach((device, index) => {
+        printerList.push({
+          id: index,
+          name: device.deviceDescriptor?.iProduct || `USB Yazıcı ${index + 1}`,
+          vendorId: device.deviceDescriptor?.idVendor,
+          productId: device.deviceDescriptor?.idProduct,
+          type: 'usb'
+        });
+      });
+    }
+    
+    res.json({ printers: printerList });
+  } catch (error) {
+    console.error('Yazıcı listesi alınamadı:', error);
+    res.status(500).json({ error: 'Yazıcı listesi alınamadı: ' + error.message });
+  }
+});
+
+// USB yazıcıya fiş yazdır
+app.post('/api/print/receipt', (req, res) => {
+  const { tableId, printerIndex } = req.body;
+  
+  if (!tableId) {
+    res.status(400).json({ error: 'Masa ID gerekli' });
+    return;
+  }
+  
+  // Fiş verilerini al
+  db.get(`SELECT * FROM tables WHERE id = ?`, [tableId], (err, table) => {
+    if (err || !table) {
+      res.status(400).json({ error: 'Masa bulunamadı' });
+      return;
+    }
+    
+    db.all(`SELECT orders.id, products.name, products.price, orders.quantity, orders.total 
+            FROM orders 
+            JOIN products ON orders.productId = products.id 
+            WHERE orders.tableId = ? 
+            ORDER BY orders.createdAt`, [tableId], (err, orders) => {
+      if (err) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      
+      if (!orders || orders.length === 0) {
+        res.status(400).json({ error: 'Bu masada sipariş bulunamadı' });
+        return;
+      }
+      
+      db.get(`SELECT value as restaurantName FROM settings WHERE key = 'restaurantName'`, (err, setting) => {
+        const restaurantName = setting?.value || 'Emek Cafe Adisyon';
+        
+        try {
+          // USB yazıcıları bul
+          const usbDevices = escposUSB.find();
+          
+          if (!usbDevices || usbDevices.length === 0) {
+            res.status(404).json({ error: 'USB yazıcı bulunamadı. Lütfen yazıcınızın bağlı olduğundan emin olun.' });
+            return;
+          }
+          
+          // Yazıcı seçimi (printerIndex varsa onu kullan, yoksa ilk yazıcıyı kullan)
+          const selectedPrinterIndex = printerIndex !== undefined ? printerIndex : 0;
+          
+          if (selectedPrinterIndex >= usbDevices.length) {
+            res.status(404).json({ error: 'Seçilen yazıcı bulunamadı' });
+            return;
+          }
+          
+          const usbDevice = new escposUSB.USB(usbDevices[selectedPrinterIndex]);
+          const printer = new escpos.Printer(usbDevice);
+          
+          // Yazdırma işlemi
+          usbDevice.open((error) => {
+            if (error) {
+              console.error('Yazıcı açılamadı:', error);
+              res.status(500).json({ error: 'Yazıcı açılamadı: ' + error.message });
+              return;
+            }
+            
+            // Fiş formatla ve yazdır
+            printer
+              .font('a')
+              .align('ct')
+              .size(1, 1)
+              .text(restaurantName)
+              .size(0, 0)
+              .feed(1)
+              .text('--------------------------------')
+              .align('lt')
+              .text(`Masa: ${table.name}`)
+              .text(`Tarih: ${new Date().toLocaleString('tr-TR')}`)
+              .text('--------------------------------');
+            
+            // Siparişleri yazdır
+            orders.forEach((order) => {
+              const line = `${order.name} x${order.quantity}`;
+              const price = `${order.total.toFixed(2)} ₺`;
+              const spaces = 32 - line.length - price.length;
+              const spacesStr = ' '.repeat(Math.max(0, spaces));
+              printer.text(`${line}${spacesStr}${price}`);
+            });
+            
+            printer
+              .text('--------------------------------')
+              .align('rt')
+              .text(`TOPLAM: ${table.total.toFixed(2)} ₺`)
+              .align('lt')
+              .feed(2)
+              .text('--------------------------------')
+              .align('ct')
+              .text('Nişanca Mahallesi Türkeli Caddesi,')
+              .text('Kumkapı 70/B, 34130 Fatih/İstanbul')
+              .feed(1)
+              .text('(0212) 516 54 86')
+              .feed(1)
+              .text('Bizi tercih ettiğiniz için')
+              .text('teşekkür ederiz!')
+              .feed(3)
+              .cut();
+            
+            // Yazdırmayı tamamla ve kapat
+            printer.flush(() => {
+              usbDevice.close(() => {
+                console.log('✅ Fiş başarıyla yazdırıldı');
+                res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
+              });
+            });
+          });
+        } catch (error) {
+          console.error('Yazdırma hatası:', error);
+          res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
+        }
       });
     });
   });

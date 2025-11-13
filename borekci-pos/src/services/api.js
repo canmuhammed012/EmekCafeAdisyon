@@ -82,6 +82,10 @@ export const login = (credentials) => api.post('/auth/login', credentials);
 // Receipt
 export const getReceipt = (tableId) => api.get(`/receipt/${tableId}`);
 
+// Printers
+export const getPrinters = () => api.get('/printers');
+export const printReceipt = (tableId, printerIndex = 0) => api.post('/print/receipt', { tableId, printerIndex });
+
 // Server Info
 export const getServerInfo = () => api.get('/server/info');
 
