@@ -3,6 +3,9 @@
 
 ; Kurulum sonrası section (otomatik çalışır)
 Section -Post
+  ; Masaüstü kısayolu oluştur (icon ile)
+  CreateShortCut "$DESKTOP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0 SW_SHOWNORMAL "" "$INSTDIR\Emek Cafe Adisyon.exe"
+  
   ; Startup klasörüne kısayol ekle (icon ile)
   CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0 SW_SHOWNORMAL "" "$INSTDIR\Emek Cafe Adisyon.exe"
   
@@ -12,6 +15,9 @@ SectionEnd
 
 ; Kaldırma işlemi için custom uninstall macro
 !macro customUnInstall
+  ; Masaüstü kısayolunu sil
+  Delete "$DESKTOP\Emek Cafe Adisyon.lnk"
+  
   ; Startup klasöründen kısayolu sil
   Delete "$SMSTARTUP\Emek Cafe Adisyon.lnk"
   
