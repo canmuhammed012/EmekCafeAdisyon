@@ -339,22 +339,20 @@ const TableDetail = ({ user }) => {
                        </div>
                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
                          {orders.length > 0 && (
-                           <div className="flex gap-1 sm:gap-2">
+                           <div className="flex gap-2 sm:gap-3">
                              <button
                                onClick={() => handlePayment('Nakit')}
-                               className="bg-green-600 hover:bg-green-700 text-white font-bold py-1 sm:py-2 px-2 sm:px-3 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
-                               style={{ fontSize: 'clamp(0.7rem, 0.85vw, 0.85rem)' }}
+                               className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
                              >
-                               <span style={{ fontSize: 'clamp(0.9rem, 1.1vw, 1.1rem)' }}>💵</span>
+                               <span className="text-base sm:text-lg md:text-xl">💵</span>
                                <span className="hidden sm:inline">Nakit ile Kapat</span>
                                <span className="sm:hidden">Nakit</span>
                              </button>
                              <button
                                onClick={() => handlePayment('Kart')}
-                               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 sm:py-2 px-2 sm:px-3 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
-                               style={{ fontSize: 'clamp(0.7rem, 0.85vw, 0.85rem)' }}
+                               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
                              >
-                               <span style={{ fontSize: 'clamp(0.9rem, 1.1vw, 1.1rem)' }}>💳</span>
+                               <span className="text-base sm:text-lg md:text-xl">💳</span>
                                <span className="hidden sm:inline">Kart ile Kapat</span>
                                <span className="sm:hidden">Kart</span>
                              </button>
