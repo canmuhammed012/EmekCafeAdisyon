@@ -1098,28 +1098,63 @@ app.post('/api/print/receipt', (req, res) => {
           console.log('🔍 Windows yazıcıları aranıyor...');
           console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
           
-          // node-printer API'sini kontrol et
+          // Windows API kullanarak yazıcıları bul (direkt Windows komutlarını kullan)
           let printers = [];
-          if (typeof printer.getPrinters === 'function') {
-            printers = printer.getPrinters();
-          } else if (typeof printer.list === 'function') {
-            printers = printer.list();
-          } else if (printer && Array.isArray(printer)) {
-            printers = printer;
-          } else {
-            // Windows API kullanarak yazıcıları bul
+          try {
+            const { execSync } = require('child_process');
+            console.log('🔍 Windows wmic komutu çalıştırılıyor...');
+            
+            // wmic komutu ile yazıcıları bul
+            const output = execSync('wmic printer get name', { 
+              encoding: 'utf-8',
+              timeout: 5000
+            });
+            
+            console.log('📋 wmic çıktısı:', output);
+            
+            const lines = output.split('\n')
+              .map(line => line.trim())
+              .filter(line => line && line !== 'Name' && line.length > 0);
+            
+            console.log('📋 Bulunan yazıcı satırları:', lines);
+            
+            printers = lines.map((name, index) => ({
+              name: name,
+              isDefault: index === 0,
+              status: 'ready'
+            }));
+            
+            console.log('✅ Windows yazıcıları bulundu:', printers.length);
+            printers.forEach((p, i) => {
+              console.log(`  ${i + 1}. ${p.name} (default: ${p.isDefault})`);
+            });
+          } catch (winError) {
+            console.error('❌ Windows yazıcı listesi alınamadı:', winError);
+            console.error('Hata detayları:', winError.message);
+            
+            // Alternatif: PowerShell komutu dene
             try {
+              console.log('🔄 PowerShell komutu deneniyor...');
               const { execSync } = require('child_process');
-              const output = execSync('wmic printer get name', { encoding: 'utf-8' });
-              const lines = output.split('\n').filter(line => line.trim() && line.trim() !== 'Name');
-              printers = lines.map((name, index) => ({
-                name: name.trim(),
+              const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+                encoding: 'utf-8',
+                timeout: 5000
+              });
+              
+              const psLines = psOutput.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line.length > 0);
+              
+              printers = psLines.map((name, index) => ({
+                name: name,
                 isDefault: index === 0,
                 status: 'ready'
               }));
-            } catch (winError) {
-              console.error('Windows yazıcı listesi alınamadı:', winError);
-              throw new Error('Yazıcı listesi alınamadı');
+              
+              console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
+            } catch (psError) {
+              console.error('❌ PowerShell komutu da başarısız:', psError);
+              throw new Error('Yazıcı listesi alınamadı: ' + winError.message);
             }
           }
           
@@ -1134,15 +1169,39 @@ app.post('/api/print/receipt', (req, res) => {
           // Yazıcı seçimi
           let selectedPrinter;
           if (printerName) {
-            // Belirtilen yazıcıyı bul
-            selectedPrinter = printers.find(p => p.name === printerName || p.name.includes(printerName));
+            // Belirtilen yazıcıyı bul (case-insensitive, partial match)
+            selectedPrinter = printers.find(p => 
+              p.name.toLowerCase() === printerName.toLowerCase() || 
+              p.name.toLowerCase().includes(printerName.toLowerCase()) ||
+              printerName.toLowerCase().includes(p.name.toLowerCase())
+            );
             if (!selectedPrinter) {
-              res.status(404).json({ error: `Yazıcı bulunamadı: ${printerName}` });
+              console.error('❌ Belirtilen yazıcı bulunamadı:', printerName);
+              console.log('📋 Mevcut yazıcılar:', printers.map(p => p.name));
+              res.status(404).json({ 
+                error: `Yazıcı bulunamadı: ${printerName}`,
+                availablePrinters: printers.map(p => p.name)
+              });
               return;
             }
           } else {
-            // Varsayılan yazıcıyı veya ilk yazıcıyı kullan
-            selectedPrinter = printers.find(p => p.isDefault) || printers[0];
+            // POS-80 veya benzeri yazıcıları öncelikle ara
+            selectedPrinter = printers.find(p => 
+              p.name.toLowerCase().includes('pos') || 
+              p.name.toLowerCase().includes('80') ||
+              p.name.toLowerCase().includes('q900')
+            );
+            
+            // Bulunamazsa varsayılan yazıcıyı veya ilk yazıcıyı kullan
+            if (!selectedPrinter) {
+              selectedPrinter = printers.find(p => p.isDefault) || printers[0];
+            }
+          }
+          
+          if (!selectedPrinter) {
+            console.error('❌ Hiç yazıcı bulunamadı');
+            res.status(404).json({ error: 'Hiç yazıcı bulunamadı. Lütfen yazıcınızın yüklü olduğundan emin olun.' });
+            return;
           }
           
           console.log('🖨️ Seçilen yazıcı:', selectedPrinter.name);
