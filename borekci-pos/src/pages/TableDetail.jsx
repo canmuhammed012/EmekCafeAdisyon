@@ -385,7 +385,7 @@ const TableDetail = ({ user }) => {
                          Bu kategoride ürün yok
                        </div>
                      ) : (
-                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ gridAutoRows: 'minmax(80px, auto)' }}>
+                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ gap: 'clamp(0.375rem, 1vw, 0.75rem)', gridAutoRows: 'minmax(100px, auto)' }}>
                 {products.map((product) => {
                   // Seçili kategorinin rengini bul
                   const currentCategory = categories.find(cat => cat.id === selectedCategory);
@@ -413,7 +413,7 @@ const TableDetail = ({ user }) => {
                     <div
                       key={product.id}
                       onClick={() => handleAddProduct(product.id)}
-                      className="relative overflow-hidden bg-gray-50 dark:bg-gray-700 rounded-lg p-1.5 sm:p-2 cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex flex-col justify-center"
+                      className="relative overflow-hidden bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex flex-col justify-center"
                       style={{
                         aspectRatio: '1.5 / 1',
                         border: '2px solid',
@@ -421,9 +421,10 @@ const TableDetail = ({ user }) => {
                         boxShadow: hasCustomColor 
                           ? `0 3px 15px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3), 0 1px 7px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
                           : '0 3px 5px -1px rgb(0 0 0 / 0.1), 0 1px 3px -2px rgb(0 0 0 / 0.1)',
-                        minHeight: '80px',
-                        minWidth: '0',
-                        maxWidth: '100%'
+                        minHeight: '100px',
+                        minWidth: '120px',
+                        maxWidth: '100%',
+                        padding: 'clamp(0.5rem, 1.5vw, 1rem)'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -435,11 +436,29 @@ const TableDetail = ({ user }) => {
                       ></div>
                       
                       {/* İçerik */}
-                      <div className="relative z-10 flex flex-col items-center justify-center text-center h-full px-1" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-1 sm:mb-2 leading-tight break-words w-full overflow-hidden" style={{ transform: 'translateZ(0)', fontSize: 'clamp(0.65rem, 1.8vw, 1.1rem)' }}>
+                      <div className="relative z-10 flex flex-col items-center justify-center text-center h-full w-full" style={{ transform: 'translateZ(0)', willChange: 'transform', gap: 'clamp(0.25rem, 0.75vw, 0.5rem)' }}>
+                        <h3 
+                          className="font-bold text-gray-800 dark:text-white leading-tight w-full overflow-hidden"
+                          style={{ 
+                            transform: 'translateZ(0)', 
+                            fontSize: 'clamp(0.75rem, 2vw + 0.25rem, 1.125rem)',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.3'
+                          }}
+                        >
                           {product.name}
                         </h3>
-                        <p className="font-bold overflow-hidden text-ellipsis" style={{ color: productColor, transform: 'translateZ(0)', fontSize: 'clamp(0.75rem, 2vw, 1.25rem)' }}>
+                        <p 
+                          className="font-bold whitespace-nowrap overflow-hidden text-ellipsis w-full" 
+                          style={{ 
+                            color: productColor, 
+                            transform: 'translateZ(0)', 
+                            fontSize: 'clamp(0.875rem, 2.25vw + 0.25rem, 1.375rem)'
+                          }}
+                        >
                           {product.price.toFixed(2)} ₺
                         </p>
                       </div>

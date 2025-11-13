@@ -347,35 +347,47 @@ if (app.isPackaged) {
     console.log('   ? Kontrol edilemedi:', e.message);
   }
   
-  // Güncelleme kontrolü - uygulama açıldıktan 5 saniye sonra (app.whenReady zaten çağrıldı)
+  // Güncelleme kontrolünü hemen başlat - HER AÇILIŞTA KONTROL ET!
+  console.log('\n========================================');
+  console.log('🔍 AUTO-UPDATER BAŞLATILIYOR');
+  console.log('========================================');
+  console.log('📦 Mevcut versiyon:', app.getVersion());
+  console.log('📡 Feed URL:', autoUpdater.getFeedURL());
+  console.log('🔧 GitHub Repository:', 'canmuhammed012/EmekCafeAdisyon');
+  console.log('========================================\n');
+  
+  // İLK KONTROL - HEMEN!
   setTimeout(() => {
-    console.log('🔍 Güncelleme kontrol ediliyor...');
-    console.log('📡 Feed URL:', autoUpdater.getFeedURL());
-    console.log('📦 Mevcut versiyon:', app.getVersion());
-    console.log('🔧 Auto-updater ayarları:', {
-      provider: 'github',
-      owner: 'canmuhammed012',
-      repo: 'EmekCafeAdisyon'
-    });
+    console.log('🔍 İlk güncelleme kontrolü BAŞLADI...');
     autoUpdater.checkForUpdates().catch((err) => {
       console.error('❌ Güncelleme kontrol hatası:', err);
     });
-  }, 5000);
+  }, 2000); // 2 saniye sonra (ağ bağlantısı için kısa bir bekleme)
   
-  // Her 30 dakikada bir kontrol et
+  // PERİYODİK KONTROL - Her 3 dakikada bir (çok sık kontrol)
   setInterval(() => {
-    console.log('🔍 Güncelleme kontrol ediliyor (periyodik)...');
-    autoUpdater.checkForUpdates();
-  }, 30 * 60 * 1000); // 30 dakika
+    console.log('🔍 Periyodik güncelleme kontrolü başlatılıyor...');
+    console.log('📦 Mevcut versiyon:', app.getVersion());
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('❌ Periyodik kontrol hatası:', err);
+    });
+  }, 3 * 60 * 1000); // 3 dakika
   
   autoUpdater.on('checking-for-update', () => {
-    console.log('🔍 Güncelleme kontrol ediliyor...');
+    console.log('\n🔍 ========== GÜNCELLEME KONTROL EDİLİYOR ==========');
+    console.log('📅 Zaman:', new Date().toLocaleString('tr-TR'));
+    console.log('📦 Mevcut versiyon:', app.getVersion());
   });
   
   autoUpdater.on('update-available', (info) => {
-    console.log('🔄 Güncelleme mevcut:', info.version);
-    console.log('📦 Güncelleme bilgileri:', JSON.stringify(info, null, 2));
-    console.log('📥 Auto-updater cache dir:', autoUpdater.downloadedUpdateHelperCacheDirName);
+    console.log('\n🎉 ========== YENİ GÜNCELLEME MEVCUT! ==========');
+    console.log('🆕 Yeni versiyon:', info.version);
+    console.log('📦 Mevcut versiyon:', app.getVersion());
+    console.log('📅 Release tarihi:', info.releaseDate);
+    console.log('📝 Güncelleme notları:', info.releaseNotes || 'Yok');
+    console.log('📦 Tam güncelleme bilgileri:', JSON.stringify(info, null, 2));
+    console.log('📥 Cache dizini:', autoUpdater.downloadedUpdateHelperCacheDirName);
+    
     // Windows'ta genellikle şu konumlar kullanılır:
     const possiblePaths = [
       path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater'),
@@ -396,35 +408,57 @@ if (app.isPackaged) {
         console.log(`     ? Kontrol edilemedi`);
       }
     });
+    console.log('==============================================\n');
+    
     if (mainWindow) {
       mainWindow.webContents.send('update-available', info.version);
+      // Kullanıcıya göster
+      const { dialog } = require('electron');
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Güncelleme Mevcut',
+        message: `Yeni sürüm mevcut: ${info.version}`,
+        detail: 'Güncelleme indiriliyor...',
+        buttons: ['Tamam']
+      });
     }
   });
   
   autoUpdater.on('update-not-available', (info) => {
-    console.log('✅ Güncel sürüm kullanılıyor');
+    console.log('\n✅ ========== GÜNCELLEME YOK ==========');
     console.log('📦 Mevcut versiyon:', app.getVersion());
-    console.log('📦 Kontrol edilen versiyon:', info?.version || 'bilinmiyor');
+    console.log('✅ Zaten en güncel sürümü kullanıyorsunuz!');
+    console.log('📅 Kontrol zamanı:', new Date().toLocaleString('tr-TR'));
+    console.log('=====================================\n');
   });
   
   autoUpdater.on('download-progress', (progressObj) => {
-    let log_message = "İndiriliyor: " + progressObj.percent + "%";
-    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-    console.log(log_message);
-    // İndirme konumunu göster
-    const downloadPath = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater');
-    console.log('📁 İndirme konumu:', downloadPath);
-    if (fs.existsSync(downloadPath)) {
-      console.log('📁 Klasör içeriği:', fs.readdirSync(downloadPath));
+    const percent = Math.round(progressObj.percent);
+    const transferred = (progressObj.transferred / 1024 / 1024).toFixed(2);
+    const total = (progressObj.total / 1024 / 1024).toFixed(2);
+    const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
+    
+    console.log(`📥 İndiriliyor: ${percent}% | ${transferred}/${total} MB | Hız: ${speed} MB/s`);
+    
+    // İndirme konumunu göster (sadece ilk kez)
+    if (percent < 5) {
+      const downloadPath = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'emek-cafe-adisyon-updater');
+      console.log('📁 İndirme konumu:', downloadPath);
+      if (fs.existsSync(downloadPath)) {
+        console.log('📁 Klasör içeriği:', fs.readdirSync(downloadPath));
+      }
     }
+    
     if (mainWindow) {
       mainWindow.webContents.send('download-progress', progressObj);
     }
   });
   
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('✅ Güncelleme indirildi:', info.version);
-    console.log('📦 İndirilen güncelleme bilgileri:', JSON.stringify(info, null, 2));
+    console.log('\n🎊 ========== GÜNCELLEME İNDİRİLDİ! ==========');
+    console.log('✅ İndirilen versiyon:', info.version);
+    console.log('📅 İndirme zamanı:', new Date().toLocaleString('tr-TR'));
+    console.log('📦 Güncelleme bilgileri:', JSON.stringify(info, null, 2));
     
     // İndirme konumunu göster - tüm olası konumları kontrol et
     const possiblePaths = [
@@ -475,8 +509,12 @@ if (app.isPackaged) {
   });
   
   autoUpdater.on('error', (error) => {
-    console.error('❌ Güncelleme hatası:', error.message);
-    console.error('❌ Hata detayları:', error);
+    console.error('\n❌ ========== GÜNCELLEME HATASI! ==========');
+    console.error('❌ Hata mesajı:', error.message);
+    console.error('❌ Hata tipi:', error.name);
+    console.error('❌ Tam hata detayları:', error);
+    console.error('📅 Hata zamanı:', new Date().toLocaleString('tr-TR'));
+    console.error('==========================================\n');
   });
 }
 
