@@ -1012,31 +1012,59 @@ app.get('/api/print/test', (req, res) => {
   res.json({ success: true, message: 'Print endpoint çalışıyor' });
 });
 
-// Windows yazıcılarını listele (node-printer kullanarak)
+// Windows yazıcılarını listele (PowerShell öncelikli)
 app.get('/api/printers/windows', (req, res) => {
   try {
     console.log('🔍 Windows yazıcıları aranıyor...');
-    console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
-    
+    const { execSync } = require('child_process');
     let printers = [];
-    if (typeof printer.getPrinters === 'function') {
-      printers = printer.getPrinters();
-    } else if (typeof printer.list === 'function') {
-      printers = printer.list();
-    } else {
-      // Windows API kullanarak yazıcıları bul
+    
+    // Önce PowerShell komutunu dene
+    try {
+      console.log('🔍 PowerShell komutu çalıştırılıyor...');
+      const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+        encoding: 'utf-8',
+        timeout: 5000,
+        shell: true
+      });
+      
+      const psLines = psOutput.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && line.length > 0);
+      
+      printers = psLines.map((name, index) => ({
+        name: name,
+        isDefault: index === 0,
+        status: 'ready'
+      }));
+      
+      console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
+    } catch (psError) {
+      console.error('❌ PowerShell komutu başarısız:', psError.message);
+      
+      // Fallback: wmic komutunu dene
       try {
-        const { execSync } = require('child_process');
-        const output = execSync('wmic printer get name', { encoding: 'utf-8' });
-        const lines = output.split('\n').filter(line => line.trim() && line.trim() !== 'Name');
+        console.log('🔄 wmic komutu deneniyor...');
+        const output = execSync('wmic printer get name', { 
+          encoding: 'utf-8',
+          timeout: 5000,
+          shell: true
+        });
+        
+        const lines = output.split('\n')
+          .map(line => line.trim())
+          .filter(line => line && line !== 'Name' && line.length > 0);
+        
         printers = lines.map((name, index) => ({
-          name: name.trim(),
+          name: name,
           isDefault: index === 0,
           status: 'ready'
         }));
-      } catch (winError) {
-        console.error('Windows yazıcı listesi alınamadı:', winError);
-        throw winError;
+        
+        console.log('✅ wmic ile yazıcılar bulundu:', printers.length);
+      } catch (wmicError) {
+        console.error('❌ wmic komutu da başarısız:', wmicError.message);
+        throw new Error('Yazıcı listesi alınamadı. PowerShell ve wmic komutları başarısız oldu.');
       }
     }
     
@@ -1098,63 +1126,100 @@ app.post('/api/print/receipt', (req, res) => {
           console.log('🔍 Windows yazıcıları aranıyor...');
           console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
           
-          // Windows API kullanarak yazıcıları bul (direkt Windows komutlarını kullan)
+          // Windows API kullanarak yazıcıları bul (PowerShell öncelikli, wmic fallback)
           let printers = [];
+          const { execSync } = require('child_process');
+          
+          // Önce PowerShell komutunu dene (daha güvenilir)
           try {
-            const { execSync } = require('child_process');
-            console.log('🔍 Windows wmic komutu çalıştırılıyor...');
-            
-            // wmic komutu ile yazıcıları bul
-            const output = execSync('wmic printer get name', { 
+            console.log('🔍 PowerShell komutu çalıştırılıyor...');
+            const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
               encoding: 'utf-8',
-              timeout: 5000
+              timeout: 5000,
+              shell: true
             });
             
-            console.log('📋 wmic çıktısı:', output);
+            console.log('📋 PowerShell çıktısı:', psOutput);
             
-            const lines = output.split('\n')
+            const psLines = psOutput.split('\n')
               .map(line => line.trim())
-              .filter(line => line && line !== 'Name' && line.length > 0);
+              .filter(line => line && line.length > 0);
             
-            console.log('📋 Bulunan yazıcı satırları:', lines);
+            console.log('📋 Bulunan yazıcı satırları:', psLines);
             
-            printers = lines.map((name, index) => ({
+            printers = psLines.map((name, index) => ({
               name: name,
               isDefault: index === 0,
               status: 'ready'
             }));
             
-            console.log('✅ Windows yazıcıları bulundu:', printers.length);
+            console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
             printers.forEach((p, i) => {
               console.log(`  ${i + 1}. ${p.name} (default: ${p.isDefault})`);
             });
-          } catch (winError) {
-            console.error('❌ Windows yazıcı listesi alınamadı:', winError);
-            console.error('Hata detayları:', winError.message);
+          } catch (psError) {
+            console.error('❌ PowerShell komutu başarısız:', psError.message);
             
-            // Alternatif: PowerShell komutu dene
+            // Fallback: wmic komutunu dene
             try {
-              console.log('🔄 PowerShell komutu deneniyor...');
-              const { execSync } = require('child_process');
-              const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
+              console.log('🔄 wmic komutu deneniyor...');
+              const output = execSync('wmic printer get name', { 
                 encoding: 'utf-8',
-                timeout: 5000
+                timeout: 5000,
+                shell: true
               });
               
-              const psLines = psOutput.split('\n')
-                .map(line => line.trim())
-                .filter(line => line && line.length > 0);
+              console.log('📋 wmic çıktısı:', output);
               
-              printers = psLines.map((name, index) => ({
+              const lines = output.split('\n')
+                .map(line => line.trim())
+                .filter(line => line && line !== 'Name' && line.length > 0);
+              
+              console.log('📋 Bulunan yazıcı satırları:', lines);
+              
+              printers = lines.map((name, index) => ({
                 name: name,
                 isDefault: index === 0,
                 status: 'ready'
               }));
               
-              console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
-            } catch (psError) {
-              console.error('❌ PowerShell komutu da başarısız:', psError);
-              throw new Error('Yazıcı listesi alınamadı: ' + winError.message);
+              console.log('✅ wmic ile yazıcılar bulundu:', printers.length);
+              printers.forEach((p, i) => {
+                console.log(`  ${i + 1}. ${p.name} (default: ${p.isDefault})`);
+              });
+            } catch (wmicError) {
+              console.error('❌ wmic komutu da başarısız:', wmicError.message);
+              
+              // Son çare: Windows registry'den yazıcıları oku
+              try {
+                console.log('🔄 Registry\'den yazıcılar okunuyor...');
+                const regPath = 'HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Devices';
+                const regOutput = execSync(`reg query "${regPath}" /s`, {
+                  encoding: 'utf-8',
+                  timeout: 5000,
+                  shell: true
+                });
+                
+                // Registry çıktısını parse et
+                const regLines = regOutput.split('\n')
+                  .filter(line => line.includes('REG_SZ'))
+                  .map(line => {
+                    const match = line.match(/REG_SZ\s+(.+)/);
+                    return match ? match[1].trim() : null;
+                  })
+                  .filter(name => name && name.length > 0);
+                
+                printers = regLines.map((name, index) => ({
+                  name: name,
+                  isDefault: index === 0,
+                  status: 'ready'
+                }));
+                
+                console.log('✅ Registry ile yazıcılar bulundu:', printers.length);
+              } catch (regError) {
+                console.error('❌ Registry okuma da başarısız:', regError.message);
+                throw new Error('Yazıcı listesi alınamadı. PowerShell, wmic ve registry yöntemleri başarısız oldu.');
+              }
             }
           }
           
