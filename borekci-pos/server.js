@@ -695,7 +695,9 @@ app.get('/api/payments', (req, res) => {
   let params = [];
   
   if (date) {
-    query += ` WHERE DATE(p.createdAt) = ?`;
+    // GMT+3 için local timezone'a çevir (UTC+3 = +3 hours)
+    // datetime() ile local timezone'a çevirip DATE() ile karşılaştır
+    query += ` WHERE DATE(datetime(p.createdAt, '+3 hours')) = ?`;
     params.push(date);
   }
   
@@ -713,6 +715,8 @@ app.get('/api/payments', (req, res) => {
 app.get('/api/reports/daily', (req, res) => {
   const date = req.query.date || new Date().toISOString().split('T')[0];
   
+  // GMT+3 için local timezone'a çevir (UTC+3 = +3 hours)
+  // datetime() ile local timezone'a çevirip DATE() ile karşılaştır
   db.get(`SELECT 
     COUNT(DISTINCT p.tableId) as totalTables,
     COUNT(p.id) as totalPayments,
@@ -720,7 +724,7 @@ app.get('/api/reports/daily', (req, res) => {
     SUM(CASE WHEN p.paymentType = 'Nakit' THEN p.amount ELSE 0 END) as cashRevenue,
     SUM(CASE WHEN p.paymentType = 'Kart' THEN p.amount ELSE 0 END) as cardRevenue
     FROM payments p
-    WHERE DATE(p.createdAt) = ?`, [date], (err, row) => {
+    WHERE DATE(datetime(p.createdAt, '+3 hours')) = ?`, [date], (err, row) => {
     if (err) res.status(400).json({error: err.message});
     else res.json(row || {
       totalTables: 0,
