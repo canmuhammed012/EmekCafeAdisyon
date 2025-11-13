@@ -263,11 +263,11 @@ const TableDetail = ({ user }) => {
 
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-hidden">
-      <div className="flex-1 pt-4 overflow-hidden min-h-0">
+      <div className="flex-1 pt-4 pb-0 overflow-hidden min-h-0">
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-180px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(200px, 20vw, 280px)', maxWidth: '280px' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(200px, 20vw, 280px)', maxWidth: '280px', height: '100%' }}>
             <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
               {categories.map((category) => {
@@ -327,11 +327,11 @@ const TableDetail = ({ user }) => {
           </div>
 
                  {/* Orta ve Sağ taraf - Ürünler ve Siparişler */}
-                 <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-[calc(100vh-180px)]">
+                 <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ height: '100%' }}>
                    {/* Orta - Header ve Ürünler - %20 daraltıldı */}
-                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-full" style={{ flexBasis: 'auto', minWidth: 0, maxWidth: '80%' }}>
+                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ flexBasis: 'auto', minWidth: 0, maxWidth: '80%', height: '100%' }}>
                      {/* Header */}
-                     <div className="bg-white dark:bg-gray-800 shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
+                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
                        <div>
                          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
                            Masa {id} - Siparişler
@@ -387,7 +387,7 @@ const TableDetail = ({ user }) => {
                      </div>
 
               {/* Products Grid */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col lg:max-h-full" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
                 <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Ürünler</h2>
                      {menuLoading ? (
                        <div className="text-center py-8 text-gray-600 dark:text-gray-400">Yükleniyor...</div>
@@ -397,8 +397,8 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                         gap: 'clamp(0.375rem, 0.8vw, 0.75rem)',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 15vw, 220px), 1fr))',
+                         gap: 'clamp(0.25rem, 0.6vw, 0.5rem)',
                          gridAutoRows: 'min-content',
                          padding: '0.25rem',
                          justifyContent: 'start',
@@ -434,16 +434,16 @@ const TableDetail = ({ user }) => {
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
                         aspectRatio: '1.35 / 1',
-                        border: 'clamp(2px, 0.25vw, 3px) solid',
+                        border: 'clamp(1px, 0.2vw, 2px) solid',
                         borderColor: productColor,
                         boxShadow: hasCustomColor 
-                          ? `0 4px 20px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4), 0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
-                          : '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                          ? `0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3), 0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
+                          : '0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
                         width: '100%',
                         height: 'auto',
-                        padding: 'clamp(0.5rem, 1vw, 0.75rem)',
+                        padding: 'clamp(0.25rem, 0.6vw, 0.5rem)',
                         overflow: 'hidden',
-                        borderRadius: 'clamp(0.5rem, 0.6vw, 0.75rem)'
+                        borderRadius: 'clamp(0.375rem, 0.5vw, 0.5rem)'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -473,7 +473,7 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: 'clamp(0.75rem, 1.1vw, 0.95rem)',
+                            fontSize: 'clamp(0.65rem, 0.9vw, 0.85rem)',
                             lineHeight: '1.3',
                             overflow: 'hidden',
                             display: '-webkit-box',
@@ -494,7 +494,7 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: 'clamp(0.85rem, 1.3vw, 1.1rem)',
+                            fontSize: 'clamp(0.7rem, 1vw, 0.95rem)',
                             lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -513,7 +513,7 @@ const TableDetail = ({ user }) => {
             </div>
 
             {/* Sağ taraf - Siparişler (Dikey Liste) - Sabit genişlik, itmesin */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden max-h-[300px] lg:max-h-[calc(100vh-180px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(210px, 21vw, 280px)', maxWidth: '280px' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(210px, 21vw, 280px)', maxWidth: '280px', height: '100%' }}>
               <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.95rem, 1.3vw, 1.25rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400" style={{ padding: 'clamp(1rem, 2vw, 1.5rem)', fontSize: 'clamp(0.75rem, 1vw, 0.875rem)' }}>
@@ -641,7 +641,7 @@ const TableDetail = ({ user }) => {
         </div>
       )}
       
-      <Footer className="flex-shrink-0" />
+      <Footer className="flex-shrink-0 mt-auto" />
     </div>
   );
 };
