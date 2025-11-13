@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -59,7 +59,7 @@
   "build": {
     "appId": "com.emekcafe.adisyon",
     "productName": "Emek Cafe Adisyon",
-    "icon": "public/logo.ico",
+    "icon": "public/logo.png",
     "directories": {
       "output": "release"
     },
@@ -87,7 +87,7 @@
           ]
         }
       ],
-      "icon": "public/logo.ico",
+      "icon": "public/logo.png",
       "signAndEditExecutable": false,
       "forceCodeSigning": false
     },
@@ -99,9 +99,7 @@
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
       "include": "electron/installer.nsh",
-      "warningsAsErrors": false,
-      "installerIcon": "public/logo.ico",
-      "uninstallerIcon": "public/logo.ico"
+      "warningsAsErrors": false
     },
     "publish": null
   }
