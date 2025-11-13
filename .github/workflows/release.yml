@@ -50,30 +50,56 @@ jobs:
         $blockmapPath = Join-Path $releasePath $blockmapFile
         $latestYml = Join-Path $releasePath "latest.yml"
         
+        Write-Host "Checking paths:"
+        Write-Host "  Exe: $exePath (exists: $(Test-Path $exePath))"
+        Write-Host "  Blockmap: $blockmapPath (exists: $(Test-Path $blockmapPath))"
+        
         if (Test-Path $exePath) {
           $fileSize = (Get-Item $exePath).Length
           $releaseDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
           
           # Blockmap dosyasından sha512 hash'i oku
-          $sha512 = "placeholder"
+          $sha512 = ""
           if (Test-Path $blockmapPath) {
-            $blockmapContent = Get-Content $blockmapPath -Raw
-            if ($blockmapContent -match '"sha512"\s*:\s*"([^"]+)"') {
-              $sha512 = $matches[1]
-              Write-Host "SHA512 found in blockmap: $sha512"
+            Write-Host "Reading blockmap file..."
+            $blockmapContent = Get-Content $blockmapPath -Raw -Encoding UTF8
+            Write-Host "Blockmap content length: $($blockmapContent.Length)"
+            
+            # JSON parse et
+            try {
+              $blockmapJson = $blockmapContent | ConvertFrom-Json
+              $sha512 = $blockmapJson.sha512
+              Write-Host "SHA512 from JSON: $sha512"
+            } catch {
+              Write-Host "JSON parse failed, trying regex..."
+              if ($blockmapContent -match '"sha512"\s*:\s*"([^"]+)"') {
+                $sha512 = $matches[1]
+                Write-Host "SHA512 from regex: $sha512"
+              } else {
+                Write-Host "Regex failed, blockmap preview:"
+                Write-Host $blockmapContent.Substring(0, [Math]::Min(200, $blockmapContent.Length))
+              }
             }
+          } else {
+            Write-Host "Blockmap file not found!"
+          }
+          
+          if ([string]::IsNullOrEmpty($sha512)) {
+            Write-Host "ERROR: SHA512 not found, using placeholder"
+            $sha512 = "PLACEHOLDER_SHA512_NOT_FOUND"
           }
           
           # latest.yml içeriğini oluştur
           $content = "version: $version`nfiles:`n  - url: $exeFile`n    sha512: $sha512`n    size: $fileSize`npath: $exeFile`nsha512: $sha512`nreleaseDate: $releaseDate"
           $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
           Write-Host "latest.yml created: $latestYml"
+          Write-Host "Content:"
           Get-Content $latestYml
         } else {
           Write-Host "Exe file not found: $exePath"
         }
       shell: powershell
-      continue-on-error: true
+      continue-on-error: false
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
