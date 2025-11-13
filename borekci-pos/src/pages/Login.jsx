@@ -134,7 +134,7 @@ const Login = ({ onLogin }) => {
         <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
           <div className="flex justify-center mb-4">
             <img 
-              src="/logo.png" 
+              src="./logo.png" 
               alt="Emek Cafe Logo" 
               className="h-24 w-auto object-contain"
               onError={(e) => {

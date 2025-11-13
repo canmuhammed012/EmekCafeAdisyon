@@ -25,9 +25,38 @@ function createWindow() {
   const minHeight = Math.max(600, Math.floor(height * 0.6));
   
   // Icon path'i belirle
-  const iconPath = app.isPackaged 
-    ? path.join(process.resourcesPath, 'public', 'logo.png')
-    : path.join(__dirname, '..', 'public', 'logo.png');
+  let iconPath;
+  if (app.isPackaged) {
+    // Production: Electron Builder logo'yu resources klasörüne koyar
+    // Önce dist klasöründe ara (ASAR içinde), sonra resources klasöründe
+    const appPath = app.getAppPath();
+    const distPath = path.join(appPath, 'logo.png'); // Vite public klasörünü dist'e kopyalar
+    const resourcesPath = path.join(process.resourcesPath, 'logo.png');
+    const publicPath = path.join(process.resourcesPath, 'public', 'logo.png');
+    
+    // Sırayla kontrol et
+    if (fs.existsSync(distPath)) {
+      iconPath = distPath;
+    } else if (fs.existsSync(resourcesPath)) {
+      iconPath = resourcesPath;
+    } else if (fs.existsSync(publicPath)) {
+      iconPath = publicPath;
+    } else {
+      // Fallback: app path'inde ara
+      iconPath = path.join(appPath, 'public', 'logo.png');
+    }
+    
+    console.log('🔍 Icon path aranıyor...');
+    console.log('  App path:', appPath);
+    console.log('  Resources path:', process.resourcesPath);
+    console.log('  Seçilen icon path:', iconPath);
+    console.log('  Icon mevcut:', fs.existsSync(iconPath));
+  } else {
+    // Development: public klasöründen
+    iconPath = path.join(__dirname, '..', 'public', 'logo.png');
+    console.log('🔍 Development icon path:', iconPath);
+    console.log('  Icon mevcut:', fs.existsSync(iconPath));
+  }
   
   mainWindow = new BrowserWindow({
     width: windowWidth,

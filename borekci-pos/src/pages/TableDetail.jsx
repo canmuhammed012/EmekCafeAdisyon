@@ -267,7 +267,7 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 200px)', maxWidth: '200px' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(180px, 18vw, 250px)', maxWidth: '250px' }}>
             <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
               {categories.map((category) => {
@@ -329,7 +329,7 @@ const TableDetail = ({ user }) => {
                  {/* Orta ve Sağ taraf - Ürünler ve Siparişler */}
                  <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-[calc(100vh-120px)]">
                    {/* Orta - Header ve Ürünler */}
-                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-full">
+                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden lg:max-h-full" style={{ flexBasis: 'auto', minWidth: 0 }}>
                      {/* Header */}
                      <div className="bg-white dark:bg-gray-800 shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
                        <div>
@@ -513,7 +513,7 @@ const TableDetail = ({ user }) => {
             </div>
 
             {/* Sağ taraf - Siparişler (Dikey Liste) - Sabit genişlik, itmesin */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden max-h-[300px] lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(160px, 16vw, 200px)', maxWidth: '200px' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden max-h-[300px] lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(190px, 19vw, 250px)', maxWidth: '250px' }}>
               <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.95rem, 1.3vw, 1.25rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400" style={{ padding: 'clamp(1rem, 2vw, 1.5rem)', fontSize: 'clamp(0.75rem, 1vw, 0.875rem)' }}>
