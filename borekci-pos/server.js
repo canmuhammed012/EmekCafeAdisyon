@@ -1089,7 +1089,7 @@ app.get('/api/printers/windows', (req, res) => {
 app.post('/api/print/receipt', (req, res) => {
   console.log('📝 /api/print/receipt endpoint çağrıldı');
   console.log('📦 Request body:', req.body);
-  const { tableId, printerName } = req.body;
+  const { tableId, printerName, printerIndex } = req.body;
   
   if (!tableId) {
     res.status(400).json({ error: 'Masa ID gerekli' });
@@ -1233,7 +1233,11 @@ app.post('/api/print/receipt', (req, res) => {
           
           // Yazıcı seçimi
           let selectedPrinter;
-          if (printerName) {
+          if (typeof printerIndex === 'number' && printerIndex >= 0 && printerIndex < printers.length) {
+            // Index ile yazıcı seç
+            selectedPrinter = printers[printerIndex];
+            console.log('📌 Index ile yazıcı seçildi:', selectedPrinter.name);
+          } else if (printerName) {
             // Belirtilen yazıcıyı bul (case-insensitive, partial match)
             selectedPrinter = printers.find(p => 
               p.name.toLowerCase() === printerName.toLowerCase() || 
@@ -1311,23 +1315,53 @@ app.post('/api/print/receipt', (req, res) => {
           // Windows yazıcıya yazdır
           console.log('✅ Yazıcıya yazdırılıyor:', selectedPrinter.name);
           
-          // Önce yazıcının gerçekten var olup olmadığını kontrol et
+          // Önce yazıcının gerçekten var olup olmadığını kontrol et (esnek kontrol)
           try {
             const { execSync } = require('child_process');
-            console.log('🔍 Yazıcı durumu kontrol ediliyor...');
-            // Yazıcı adındaki tek tırnakları escape et
-            const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''");
-            // Yazıcının durumunu kontrol et
-            const checkOutput = execSync(`powershell -Command "Get-Printer -Name '${escapedPrinterName}' -ErrorAction Stop | Select-Object Name, PrinterStatus"`, {
-              encoding: 'utf-8',
-              timeout: 3000,
-              shell: true
-            });
-            console.log('✅ Yazıcı bulundu ve hazır:', checkOutput);
+            console.log('🔍 Yazıcı durumu kontrol ediliyor:', selectedPrinter.name);
+            
+            // Yazıcı adındaki özel karakterleri escape et
+            const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''").replace(/"/g, '""');
+            
+            // Önce tam ad ile kontrol et
+            try {
+              const checkOutput = execSync(`powershell -Command "Get-Printer -Name '${escapedPrinterName}' -ErrorAction Stop | Select-Object Name, PrinterStatus"`, {
+                encoding: 'utf-8',
+                timeout: 3000,
+                shell: true
+              });
+              console.log('✅ Yazıcı bulundu ve hazır:', checkOutput);
+            } catch (exactError) {
+              // Tam ad ile bulunamazsa, partial match ile dene
+              console.log('⚠️ Tam ad ile bulunamadı, partial match deneniyor...');
+              try {
+                const allPrinters = execSync(`powershell -Command "Get-Printer | Where-Object { $_.Name -like '*${escapedPrinterName}*' -or '${escapedPrinterName}' -like \"*$($_.Name)*\" } | Select-Object Name, PrinterStatus"`, {
+                  encoding: 'utf-8',
+                  timeout: 3000,
+                  shell: true
+                });
+                
+                if (allPrinters && allPrinters.trim().length > 0) {
+                  console.log('✅ Yazıcı partial match ile bulundu:', allPrinters);
+                  // Yazıcı adını güncelle
+                  const match = allPrinters.match(/Name\s*:\s*([^\r\n]+)/);
+                  if (match) {
+                    selectedPrinter.name = match[1].trim();
+                    console.log('🔄 Yazıcı adı güncellendi:', selectedPrinter.name);
+                  }
+                } else {
+                  throw new Error('Yazıcı bulunamadı');
+                }
+              } catch (partialError) {
+                console.error('❌ Yazıcı kontrolü başarısız (tam ve partial match):', partialError.message);
+                // Yazıcı kontrolünü atla, direkt yazdırmayı dene (yazıcı Windows'ta görünüyorsa çalışabilir)
+                console.warn('⚠️ Yazıcı kontrolü atlanıyor, direkt yazdırma deneniyor...');
+              }
+            }
           } catch (checkError) {
-            console.error('❌ Yazıcı kontrolü başarısız:', checkError.message);
-            res.status(404).json({ error: `Yazıcı bulunamadı veya hazır değil: ${selectedPrinter.name}` });
-            return;
+            console.error('❌ Yazıcı kontrolü genel hatası:', checkError.message);
+            // Yazıcı kontrolünü atla, direkt yazdırmayı dene
+            console.warn('⚠️ Yazıcı kontrolü atlanıyor, direkt yazdırma deneniyor...');
           }
           
           // node-printer API'sini kontrol et ve yazdır
