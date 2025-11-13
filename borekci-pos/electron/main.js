@@ -378,7 +378,9 @@ if (app.isPackaged) {
   });
   
   autoUpdater.on('update-not-available', (info) => {
-    console.log('✅ Güncel sürüm kullanılıyor:', info.version);
+    console.log('✅ Güncel sürüm kullanılıyor');
+    console.log('📦 Mevcut versiyon:', app.getVersion());
+    console.log('📦 Kontrol edilen versiyon:', info?.version || 'bilinmiyor');
   });
   
   autoUpdater.on('download-progress', (progressObj) => {
