@@ -414,20 +414,23 @@ if (app.isPackaged) {
         console.log(`     ? Kontrol edilemedi`);
       }
     });
+    console.log('💡 Manuel olarak indirme başlatılıyor...');
     console.log('==============================================\n');
     
+    // Renderer process'e bildir (UI bildirim gösterecek)
     if (mainWindow) {
       mainWindow.webContents.send('update-available', info.version);
-      // Kullanıcıya göster
-      const { dialog } = require('electron');
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Güncelleme Mevcut',
-        message: `Yeni sürüm mevcut: ${info.version}`,
-        detail: 'Güncelleme indiriliyor...',
-        buttons: ['Tamam']
-      });
     }
+    
+    // MANUEL OLARAK İNDİRMEYİ BAŞLAT!
+    // Bazen auto-updater otomatik indirmeyi başlatmıyor, manuel başlatmak gerekiyor
+    console.log('📥 downloadUpdate() çağrılıyor...');
+    autoUpdater.downloadUpdate().then(() => {
+      console.log('✅ downloadUpdate() başarılı - indirme başladı');
+    }).catch((err) => {
+      console.error('❌ downloadUpdate() hatası:', err);
+      console.error('❌ Hata detayları:', JSON.stringify(err, null, 2));
+    });
   });
   
   autoUpdater.on('update-not-available', (info) => {
