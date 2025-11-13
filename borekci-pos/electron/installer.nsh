@@ -5,15 +5,12 @@
 !macro customInstall
   ; Icon dosyası yolu (extraResources ile kopyalanan logo.ico)
   ; Electron Builder extraResources dosyalarını $INSTDIR\resources klasörüne kopyalar
-  Var /GLOBAL iconPath
-  StrCpy $iconPath "$INSTDIR\resources\logo.ico"
-  
   ; Masaüstü kısayolu oluştur (icon ile)
   ; CreateShortCut syntax: "link.lnk" "target.exe" "parameters" "icon.ico" icon_index
   ; Önce logo.ico'yu kontrol et, yoksa .exe'yi kullan
-  IfFileExists "$iconPath" 0 UseExeIcon
+  IfFileExists "$INSTDIR\resources\logo.ico" 0 UseExeIcon
     ; Icon dosyası var, onu kullan
-    CreateShortCut "$DESKTOP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$iconPath" 0
+    CreateShortCut "$DESKTOP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\resources\logo.ico" 0
     Goto IconDone
   UseExeIcon:
     ; Icon dosyası yok, .exe dosyasının kendisini kullan
@@ -21,8 +18,8 @@
   IconDone:
   
   ; Startup klasörüne kısayol ekle (icon ile)
-  IfFileExists "$iconPath" 0 UseExeIconStartup
-    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$iconPath" 0
+  IfFileExists "$INSTDIR\resources\logo.ico" 0 UseExeIconStartup
+    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\resources\logo.ico" 0
     Goto StartupDone
   UseExeIconStartup:
     CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0
