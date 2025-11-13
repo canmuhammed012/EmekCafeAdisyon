@@ -372,7 +372,7 @@ const TableDetail = ({ user }) => {
                          {orders.length > 0 && (
                            <button
                              onClick={handleOpenTableTransferModal}
-                             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-2 px-3 sm:px-4 rounded-lg transition text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
+                             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-2 px-3 sm:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
                            >
                              <span>🔄</span>
                              <span>Masa Değiştir</span>
@@ -402,7 +402,7 @@ const TableDetail = ({ user }) => {
                          )}
                          <button
                            onClick={() => navigate('/')}
-                           className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition text-xs sm:text-sm md:text-base lg:text-lg"
+                           className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm md:text-base lg:text-lg"
                          >
                            Tamamla
                          </button>
@@ -439,7 +439,7 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(70px, 8.5vw, 140px), 1fr))',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(85px, 9.5vw, 160px), 1fr))',
                          gap: 'clamp(0.15rem, 0.35vw, 0.35rem)',
                          gridAutoRows: 'min-content',
                          padding: '0.2rem',
@@ -473,7 +473,7 @@ const TableDetail = ({ user }) => {
                     <div
                       key={product.id}
                       onClick={() => handleAddProduct(product.id)}
-                      className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
+                      className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition-all duration-150 transform hover:scale-105 active:scale-95 flex items-center justify-center"
                       style={{
                         aspectRatio: '1.2 / 1',
                         border: 'clamp(0.5px, 0.1vw, 1px) solid',
@@ -686,14 +686,14 @@ const TableDetail = ({ user }) => {
       {/* Masa Değiştirme Modalı */}
       {showTableTransferModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 max-w-2xl w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-4 sm:p-6 max-w-2xl w-full mx-4">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-2">
               Masa Değiştir - Masa {id}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
               Siparişleri taşımak istediğiniz masayı seçin:
             </p>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 max-h-96 overflow-y-auto">
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 max-h-[500px] overflow-y-auto">
               {tables
                 .filter(table => table.id !== parseInt(id))
                 .map((table) => {
@@ -703,7 +703,7 @@ const TableDetail = ({ user }) => {
                     <button
                       key={table.id}
                       onClick={() => handleTableTransfer(table.id)}
-                      className={`p-4 rounded-lg shadow-md transition transform hover:scale-105 border-2 ${
+                      className={`p-4 rounded-lg shadow-md transition-all duration-150 transform hover:scale-105 active:scale-95 border-2 ${
                         isDolu 
                           ? 'bg-red-50 dark:bg-red-900/20 border-red-500' 
                           : isBos 
@@ -728,7 +728,7 @@ const TableDetail = ({ user }) => {
             </div>
             <button
               onClick={() => setShowTableTransferModal(false)}
-              className="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold transition"
+              className="mt-3 w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-all duration-150 transform active:scale-95 text-sm"
             >
               İptal
             </button>
