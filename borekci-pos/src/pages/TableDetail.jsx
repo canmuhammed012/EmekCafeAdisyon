@@ -387,8 +387,8 @@ const TableDetail = ({ user }) => {
                      </div>
 
               {/* Products Grid */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
-                <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Ürünler</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.3rem, 0.6vw, 0.6rem)' }}>
+                <h2 className="font-bold mb-1 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.85rem, 1.1vw, 1.2rem)' }}>Ürünler</h2>
                      {menuLoading ? (
                        <div className="text-center py-8 text-gray-600 dark:text-gray-400">Yükleniyor...</div>
                      ) : products.length === 0 ? (
@@ -397,10 +397,10 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(140px, 15vw, 220px), 1fr))',
-                         gap: 'clamp(0.25rem, 0.6vw, 0.5rem)',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(60px, 8vw, 120px), 1fr))',
+                         gap: 'clamp(0.15rem, 0.3vw, 0.3rem)',
                          gridAutoRows: 'min-content',
-                         padding: '0.25rem',
+                         padding: '0.15rem',
                          justifyContent: 'start',
                          alignContent: 'start'
                        }}>
@@ -433,17 +433,17 @@ const TableDetail = ({ user }) => {
                       onClick={() => handleAddProduct(product.id)}
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
-                        aspectRatio: '1.35 / 1',
-                        border: 'clamp(1px, 0.2vw, 2px) solid',
+                        aspectRatio: '1.2 / 1',
+                        border: 'clamp(0.5px, 0.1vw, 1px) solid',
                         borderColor: productColor,
                         boxShadow: hasCustomColor 
-                          ? `0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3), 0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.15)`
-                          : '0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+                          ? `0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), 0 0.5px 3px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`
+                          : '0 1px 2px -1px rgb(0 0 0 / 0.08), 0 0.5px 1px -1px rgb(0 0 0 / 0.08)',
                         width: '100%',
                         height: 'auto',
-                        padding: 'clamp(0.25rem, 0.6vw, 0.5rem)',
+                        padding: 'clamp(0.15rem, 0.3vw, 0.3rem)',
                         overflow: 'hidden',
-                        borderRadius: 'clamp(0.375rem, 0.5vw, 0.5rem)'
+                        borderRadius: 'clamp(0.2rem, 0.3vw, 0.3rem)'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -464,7 +464,7 @@ const TableDetail = ({ user }) => {
                           maxHeight: '100%',
                           overflow: 'hidden',
                           padding: '0',
-                          gap: 'clamp(0.25rem, 0.5vw, 0.375rem)'
+                          gap: 'clamp(0.15rem, 0.25vw, 0.25rem)'
                         }}
                       >
                         {/* Ürün İsmi - Kesinlikle Taşmayacak */}
@@ -473,7 +473,7 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: 'clamp(0.65rem, 0.9vw, 0.85rem)',
+                            fontSize: 'clamp(0.5rem, 0.65vw, 0.7rem)',
                             lineHeight: '1.3',
                             overflow: 'hidden',
                             display: '-webkit-box',
@@ -494,7 +494,7 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: 'clamp(0.7rem, 1vw, 0.95rem)',
+                            fontSize: 'clamp(0.55rem, 0.7vw, 0.75rem)',
                             lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
