@@ -298,7 +298,7 @@ const TableDetail = ({ user }) => {
                     }`}
                     style={{
                       borderLeft: `clamp(4px, 0.4vw, 6px) solid ${category.color}`,
-                      minHeight: 'clamp(50px, 6vh, 75px)',
+                      minHeight: 'clamp(60px, 7vh, 90px)',
                       width: '100%',
                       backgroundColor: isSelected ? category.color : undefined,
                       fontSize: 'clamp(0.7rem, 1vw, 1rem)',
@@ -521,7 +521,7 @@ const TableDetail = ({ user }) => {
                 </p>
               ) : (
                 <div className="flex-1 overflow-y-auto min-h-0" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 0.7vw, 0.75rem)' }}>
-                  {orders.map((order) => (
+                  {[...orders].reverse().map((order) => (
                     <div
                       key={order.id}
                       className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50"
