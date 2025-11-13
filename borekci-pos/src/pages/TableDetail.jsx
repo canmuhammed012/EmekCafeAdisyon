@@ -397,10 +397,10 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(60px, 8vw, 120px), 1fr))',
-                         gap: 'clamp(0.15rem, 0.3vw, 0.3rem)',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(85px, 10vw, 170px), 1fr))',
+                         gap: 'clamp(0.2rem, 0.4vw, 0.4rem)',
                          gridAutoRows: 'min-content',
-                         padding: '0.15rem',
+                         padding: '0.2rem',
                          justifyContent: 'start',
                          alignContent: 'start'
                        }}>
@@ -441,7 +441,7 @@ const TableDetail = ({ user }) => {
                           : '0 1px 2px -1px rgb(0 0 0 / 0.08), 0 0.5px 1px -1px rgb(0 0 0 / 0.08)',
                         width: '100%',
                         height: 'auto',
-                        padding: 'clamp(0.15rem, 0.3vw, 0.3rem)',
+                        padding: 'clamp(0.2rem, 0.4vw, 0.4rem)',
                         overflow: 'hidden',
                         borderRadius: 'clamp(0.2rem, 0.3vw, 0.3rem)'
                       }}
@@ -464,7 +464,7 @@ const TableDetail = ({ user }) => {
                           maxHeight: '100%',
                           overflow: 'hidden',
                           padding: '0',
-                          gap: 'clamp(0.15rem, 0.25vw, 0.25rem)'
+                          gap: 'clamp(0.2rem, 0.3vw, 0.3rem)'
                         }}
                       >
                         {/* Ürün İsmi - Kesinlikle Taşmayacak */}
@@ -473,7 +473,7 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: 'clamp(0.5rem, 0.65vw, 0.7rem)',
+                            fontSize: 'clamp(0.6rem, 0.75vw, 0.8rem)',
                             lineHeight: '1.3',
                             overflow: 'hidden',
                             display: '-webkit-box',
@@ -494,7 +494,7 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: 'clamp(0.55rem, 0.7vw, 0.75rem)',
+                            fontSize: 'clamp(0.65rem, 0.8vw, 0.85rem)',
                             lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
