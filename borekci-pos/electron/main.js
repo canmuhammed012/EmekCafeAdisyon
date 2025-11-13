@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, globalShortcut } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
@@ -129,6 +129,16 @@ function createWindow() {
       themeCheckInterval = null;
     }
     mainWindow = null;
+  });
+  
+  // Production'da da DevTools'u açabilmek için webContents keyboard event listener
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // Ctrl+Shift+I veya F12
+    if ((input.control && input.shift && input.key.toLowerCase() === 'i') || input.key === 'F12') {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.toggleDevTools();
+      }
+    }
   });
 }
 
@@ -280,6 +290,20 @@ function showError(title, message) {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // Production'da DevTools'u açmak için global shortcut ekle
+  // Ctrl+Shift+I veya F12
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
+  
+  globalShortcut.register('F12', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -442,6 +466,9 @@ if (app.isPackaged) {
 }
 
 app.on('window-all-closed', () => {
+  // Global shortcut'ları temizle
+  globalShortcut.unregisterAll();
+  
   if (backendLoader && backendLoader.stopBackend) {
     backendLoader.stopBackend();
   }
@@ -451,6 +478,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // Global shortcut'ları temizle
+  globalShortcut.unregisterAll();
+  
   if (backendLoader && backendLoader.stopBackend) {
     backendLoader.stopBackend();
   }
