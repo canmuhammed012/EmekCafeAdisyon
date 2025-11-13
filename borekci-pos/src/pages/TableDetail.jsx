@@ -262,9 +262,9 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[180px] xl:min-w-[220px] 2xl:min-w-[260px] lg:flex-shrink-0 overflow-hidden flex flex-col">
-            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white flex-shrink-0">Kategoriler</h2>
-            <div className="flex flex-row lg:flex-col gap-2 sm:gap-4 overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 220px)' }}>
+            <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
+            <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
               {categories.map((category) => {
                 // Hex rengi RGB'ye çevir
                 const hexToRgb = (hex) => {
@@ -286,17 +286,19 @@ const TableDetail = ({ user }) => {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                      className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold transition shadow-xl whitespace-nowrap flex-shrink-0 ${
+                    className={`relative overflow-hidden rounded-lg text-left font-bold transition shadow-xl whitespace-nowrap flex-shrink-0 ${
                       isSelected
                         ? `${textColor} scale-105`
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                     style={{
-                      borderLeft: `6px solid ${category.color}`,
-                      minHeight: '40px',
-                      minWidth: '120px',
+                      borderLeft: `clamp(4px, 0.4vw, 6px) solid ${category.color}`,
+                      minHeight: 'clamp(40px, 5vh, 60px)',
+                      minWidth: 'clamp(100px, 12vw, 140px)',
                       backgroundColor: isSelected ? category.color : undefined,
-                      fontSize: 'clamp(0.75rem, 2vw, 1.25rem)'
+                      fontSize: 'clamp(0.8rem, 1.1vw + 0.2rem, 1.1rem)',
+                      padding: 'clamp(0.5rem, 1.2vw, 1rem) clamp(0.75rem, 1.5vw, 1.5rem)',
+                      lineHeight: '1.3'
                     }}
                   >
                     {/* Degrade Işık Süzmesi */}
@@ -375,9 +377,9 @@ const TableDetail = ({ user }) => {
                        </div>
                      </div>
 
-                       {/* Products Grid */}
-                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 flex-1 min-h-0 overflow-hidden flex flex-col">
-                       <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-2 sm:mb-4 text-gray-800 dark:text-white flex-shrink-0">Ürünler</h2>
+              {/* Products Grid */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md flex-1 min-h-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)' }}>
+                <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Ürünler</h2>
                      {menuLoading ? (
                        <div className="text-center py-8 text-gray-600 dark:text-gray-400">Yükleniyor...</div>
                      ) : products.length === 0 ? (
@@ -385,7 +387,12 @@ const TableDetail = ({ user }) => {
                          Bu kategoride ürün yok
                        </div>
                      ) : (
-                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ gap: 'clamp(0.375rem, 1vw, 0.75rem)', gridAutoRows: 'minmax(100px, auto)' }}>
+                       <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px, 100%), 1fr))',
+                         gap: 'clamp(0.5rem, 1vw, 1rem)',
+                         gridAutoRows: 'minmax(0, 1fr)',
+                         padding: '0.25rem'
+                       }}>
                 {products.map((product) => {
                   // Seçili kategorinin rengini bul
                   const currentCategory = categories.find(cat => cat.id === selectedCategory);
@@ -415,17 +422,18 @@ const TableDetail = ({ user }) => {
                       onClick={() => handleAddProduct(product.id)}
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
-                        aspectRatio: '1.5 / 1',
-                        border: '2px solid',
+                        aspectRatio: '1.4 / 1',
+                        border: 'clamp(2px, 0.2vw, 3px) solid',
                         borderColor: productColor,
                         boxShadow: hasCustomColor 
-                          ? `0 3px 15px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3), 0 1px 7px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
-                          : '0 3px 5px -1px rgb(0 0 0 / 0.1), 0 1px 3px -2px rgb(0 0 0 / 0.1)',
-                        minHeight: '100px',
-                        minWidth: '120px',
-                        maxWidth: '100%',
-                        padding: 'clamp(0.375rem, 1.2vw, 0.75rem)',
-                        overflow: 'hidden'
+                          ? `0 4px 20px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4), 0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
+                          : '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                        width: '100%',
+                        height: '100%',
+                        minHeight: 'clamp(100px, 12vh, 180px)',
+                        padding: 'clamp(0.5rem, 1.2vw, 1rem)',
+                        overflow: 'hidden',
+                        borderRadius: 'clamp(0.5rem, 0.8vw, 0.75rem)'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -446,7 +454,7 @@ const TableDetail = ({ user }) => {
                           maxHeight: '100%',
                           overflow: 'hidden',
                           padding: '0',
-                          gap: 'clamp(0.125rem, 0.5vw, 0.375rem)'
+                          gap: 'clamp(0.25rem, 0.6vw, 0.5rem)'
                         }}
                       >
                         {/* Ürün İsmi - Kesinlikle Taşmayacak */}
@@ -455,8 +463,8 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: 'clamp(0.7rem, 1.8vw, 1rem)',
-                            lineHeight: '1.2',
+                            fontSize: 'clamp(0.75rem, 1.2vw + 0.2rem, 1.1rem)',
+                            lineHeight: '1.25',
                             overflow: 'hidden',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
@@ -476,8 +484,8 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: 'clamp(0.8rem, 2vw, 1.2rem)',
-                            lineHeight: '1.1',
+                            fontSize: 'clamp(0.85rem, 1.4vw + 0.2rem, 1.3rem)',
+                            lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
@@ -494,9 +502,9 @@ const TableDetail = ({ user }) => {
               </div>
             </div>
 
-                 {/* Sağ taraf - Siparişler (Dikey Liste) */}
-                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[200px] xl:min-w-[240px] 2xl:min-w-[280px] lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none">
-                   <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white flex-shrink-0">Siparişler</h2>
+            {/* Sağ taraf - Siparişler (Dikey Liste) */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(180px, 18vw, 250px)' }}>
+              <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400 py-6 text-sm sm:text-base">
                   Henüz sipariş yok

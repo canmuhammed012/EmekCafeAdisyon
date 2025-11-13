@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import UpdateNotification from './components/UpdateNotification';
 import Login from './pages/Login';
 import Tables from './pages/Tables';
 import TableDetail from './pages/TableDetail';
@@ -49,6 +50,7 @@ function App() {
   return (
     <ThemeProvider>
       <SocketProvider>
+        <UpdateNotification />
         <Router>
           <Routes>
             <Route 
@@ -69,7 +71,7 @@ function App() {
             />
             <Route 
               path="/admin" 
-              element={user?.role === 'yönetici' ? <Admin user={user} /> : <Navigate to="/" replace />} 
+              element={user?.role === 'yönetici' ? <Admin user={user} /> : <Navigate to="/login" replace />} 
             />
           </Routes>
         </Router>

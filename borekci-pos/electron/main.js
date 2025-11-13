@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, Menu, globalShortcut, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
@@ -41,6 +41,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     show: false,
     backgroundColor: '#ffffff', // Varsayılan beyaz tema
@@ -287,6 +288,11 @@ function showError(title, message) {
   fs.writeFileSync(errorPath, errorHTML, 'utf-8');
   mainWindow.loadFile(errorPath);
 }
+
+// IPC Handlers
+ipcMain.on('get-version', (event) => {
+  event.returnValue = app.getVersion();
+});
 
 app.whenReady().then(() => {
   createWindow();
