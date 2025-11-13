@@ -46,32 +46,29 @@ jobs:
         $version = "${{ github.ref_name }}".Replace("v", "")
         $latestYml = Join-Path $releasePath "latest.yml"
         
+        # Find the actual .exe file in release folder
         # Electron Builder creates file name from productName, replacing spaces with dots
-        # productName: "Emek Cafe Adisyon" -> "Emek.Cafe.Adisyon.Setup.1.0.40.exe"
-        $exeFile = "Emek.Cafe.Adisyon.Setup.$version.exe"
-        $exePath = Join-Path $releasePath $exeFile
+        # List all .exe files and find the one with "Setup" and version number
+        Write-Host "Searching for .exe file in $releasePath..."
+        Write-Host "Looking for files containing 'Setup' and version '$version'..."
         
-        # Also check for alternative naming (with spaces, just in case)
-        if (-not (Test-Path $exePath)) {
-          $altExeFile = "Emek Cafe Adisyon Setup $version.exe"
-          $altExePath = Join-Path $releasePath $altExeFile
-          if (Test-Path $altExePath) {
-            $exeFile = $altExeFile
-            $exePath = $altExePath
-          } else {
-            # Try to find any .exe file with Setup and version
-            $exeFiles = Get-ChildItem -Path $releasePath -Filter "*.exe" | Where-Object { $_.Name -like "*Setup*$version*" }
-            if ($exeFiles.Count -gt 0) {
-              $exeFile = $exeFiles[0].Name
-              $exePath = $exeFiles[0].FullName
-            } else {
-              Write-Host "ERROR: No .exe file found in $releasePath"
-              Write-Host "Expected: $exeFile"
-              Write-Host "Files in release folder:"
-              Get-ChildItem -Path $releasePath | Select-Object Name
-              exit 1
-            }
-          }
+        $allExeFiles = Get-ChildItem -Path $releasePath -Filter "*.exe" | Where-Object { 
+          $_.Name -like "*Setup*" -and $_.Name -like "*$version*" -and $_.Name -notlike "*uninstaller*"
+        }
+        
+        if ($allExeFiles.Count -eq 0) {
+          Write-Host "ERROR: No .exe file found matching pattern"
+          Write-Host "Files in release folder:"
+          Get-ChildItem -Path $releasePath | Select-Object Name
+          exit 1
+        }
+        
+        $exeFile = $allExeFiles[0].Name
+        $exePath = $allExeFiles[0].FullName
+        
+        Write-Host "Found $($allExeFiles.Count) matching file(s):"
+        foreach ($file in $allExeFiles) {
+          Write-Host "  - $($file.Name)"
         }
         
         Write-Host "Found exe file: $exeFile"
