@@ -383,6 +383,11 @@ if (app.isPackaged) {
     console.log('\n🔍 ========== GÜNCELLEME KONTROL EDİLİYOR ==========');
     console.log('📅 Zaman:', new Date().toLocaleString('tr-TR'));
     console.log('📦 Mevcut versiyon:', app.getVersion());
+    
+    // Renderer'a bildir
+    if (mainWindow) {
+      mainWindow.webContents.executeJavaScript(`console.log('🔍 MAIN: Güncelleme kontrol ediliyor...')`);
+    }
   });
   
   autoUpdater.on('update-available', (info) => {
@@ -425,11 +430,26 @@ if (app.isPackaged) {
     // MANUEL OLARAK İNDİRMEYİ BAŞLAT!
     // Bazen auto-updater otomatik indirmeyi başlatmıyor, manuel başlatmak gerekiyor
     console.log('📥 downloadUpdate() çağrılıyor...');
+    
+    // Renderer'a bildir
+    if (mainWindow) {
+      mainWindow.webContents.executeJavaScript(`console.log('📥 MAIN: downloadUpdate() çağrılıyor...')`);
+    }
+    
     autoUpdater.downloadUpdate().then(() => {
       console.log('✅ downloadUpdate() başarılı - indirme başladı');
+      if (mainWindow) {
+        mainWindow.webContents.executeJavaScript(`console.log('✅ MAIN: downloadUpdate() başarılı - indirme başladı')`);
+      }
     }).catch((err) => {
       console.error('❌ downloadUpdate() hatası:', err);
       console.error('❌ Hata detayları:', JSON.stringify(err, null, 2));
+      
+      // Hatayı renderer'a da gönder
+      if (mainWindow) {
+        mainWindow.webContents.executeJavaScript(`console.error('❌ MAIN: downloadUpdate() hatası:', ${JSON.stringify(err.message || err.toString())})`);
+        mainWindow.webContents.executeJavaScript(`console.error('❌ MAIN: Hata detayları:', ${JSON.stringify(JSON.stringify(err, Object.getOwnPropertyNames(err), 2))})`);
+      }
     });
   });
   
@@ -455,6 +475,11 @@ if (app.isPackaged) {
       console.log('📁 İndirme konumu:', downloadPath);
       if (fs.existsSync(downloadPath)) {
         console.log('📁 Klasör içeriği:', fs.readdirSync(downloadPath));
+      }
+      
+      // Renderer'a da bildir
+      if (mainWindow) {
+        mainWindow.webContents.executeJavaScript(`console.log('📥 MAIN: İndirme başladı! Konum: ${downloadPath.replace(/\\/g, '\\\\')}')`);
       }
     }
     
@@ -524,6 +549,12 @@ if (app.isPackaged) {
     console.error('❌ Tam hata detayları:', error);
     console.error('📅 Hata zamanı:', new Date().toLocaleString('tr-TR'));
     console.error('==========================================\n');
+    
+    // Hatayı renderer'a da gönder
+    if (mainWindow) {
+      mainWindow.webContents.executeJavaScript(`console.error('❌ MAIN: AUTO-UPDATER HATASI! ${error.message || error.toString()}')`);
+      mainWindow.webContents.executeJavaScript(`console.error('❌ MAIN: Hata detayları:', ${JSON.stringify(JSON.stringify(error, Object.getOwnPropertyNames(error), 2))})`);
+    }
   });
 }
 
