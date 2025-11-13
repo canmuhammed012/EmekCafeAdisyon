@@ -339,20 +339,22 @@ const TableDetail = ({ user }) => {
                        </div>
                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
                          {orders.length > 0 && (
-                           <div className="flex gap-2 sm:gap-3">
+                           <div className="flex gap-1 sm:gap-2">
                              <button
                                onClick={() => handlePayment('Nakit')}
-                               className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
+                               className="bg-green-600 hover:bg-green-700 text-white font-bold py-1 sm:py-2 px-2 sm:px-3 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               style={{ fontSize: 'clamp(0.7rem, 0.85vw, 0.85rem)' }}
                              >
-                               <span className="text-base sm:text-lg md:text-xl">💵</span>
+                               <span style={{ fontSize: 'clamp(0.9rem, 1.1vw, 1.1rem)' }}>💵</span>
                                <span className="hidden sm:inline">Nakit ile Kapat</span>
                                <span className="sm:hidden">Nakit</span>
                              </button>
                              <button
                                onClick={() => handlePayment('Kart')}
-                               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 sm:py-3 md:py-4 px-4 sm:px-6 md:px-8 rounded-lg transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base"
+                               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 sm:py-2 px-2 sm:px-3 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               style={{ fontSize: 'clamp(0.7rem, 0.85vw, 0.85rem)' }}
                              >
-                               <span className="text-base sm:text-lg md:text-xl">💳</span>
+                               <span style={{ fontSize: 'clamp(0.9rem, 1.1vw, 1.1rem)' }}>💳</span>
                                <span className="hidden sm:inline">Kart ile Kapat</span>
                                <span className="sm:hidden">Kart</span>
                              </button>
@@ -397,8 +399,8 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(85px, 10vw, 170px), 1fr))',
-                         gap: 'clamp(0.2rem, 0.4vw, 0.4rem)',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(70px, 8.5vw, 140px), 1fr))',
+                         gap: 'clamp(0.15rem, 0.35vw, 0.35rem)',
                          gridAutoRows: 'min-content',
                          padding: '0.2rem',
                          justifyContent: 'start',
