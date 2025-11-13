@@ -300,9 +300,9 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(200px, 20vw, 280px)', maxWidth: '280px', height: '100%' }}>
-            <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
-            <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.4rem, 0.8vw, 0.8rem)', minWidth: 'clamp(180px, 18vw, 250px)', maxWidth: '250px', height: '100%' }}>
+            <h2 className="font-bold mb-1 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.9rem, 1.3vw, 1.3rem)' }}>Kategoriler</h2>
+            <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.4rem, 0.6vw, 0.7rem)' }}>
               {categories.map((category) => {
                 // Hex rengi RGB'ye çevir
                 const hexToRgb = (hex) => {
@@ -330,12 +330,12 @@ const TableDetail = ({ user }) => {
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                     style={{
-                      borderLeft: `clamp(4px, 0.4vw, 6px) solid ${category.color}`,
-                      minHeight: 'clamp(60px, 7vh, 90px)',
+                      borderLeft: `clamp(3px, 0.3vw, 5px) solid ${category.color}`,
+                      minHeight: 'clamp(50px, 5.5vh, 70px)',
                       width: '100%',
                       backgroundColor: isSelected ? category.color : undefined,
-                      fontSize: 'clamp(0.7rem, 1vw, 1rem)',
-                      padding: 'clamp(0.75rem, 1.2vw, 1.25rem) clamp(0.4rem, 0.6vw, 0.8rem)',
+                      fontSize: 'clamp(0.65rem, 0.85vw, 0.9rem)',
+                      padding: 'clamp(0.5rem, 0.9vw, 0.9rem) clamp(0.3rem, 0.5vw, 0.6rem)',
                       lineHeight: '1.3',
                       wordBreak: 'normal',
                       overflow: 'hidden',
