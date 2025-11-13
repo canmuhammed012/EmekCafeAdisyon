@@ -262,9 +262,9 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[180px] xl:min-w-[220px] 2xl:min-w-[260px] lg:flex-shrink-0 overflow-y-auto lg:max-h-[calc(100vh-100px)] max-h-[200px] lg:max-h-none">
-            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white">Kategoriler</h2>
-            <div className="flex flex-row lg:flex-col gap-2 sm:gap-4 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[180px] xl:min-w-[220px] 2xl:min-w-[260px] lg:flex-shrink-0 overflow-hidden flex flex-col">
+            <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white flex-shrink-0">Kategoriler</h2>
+            <div className="flex flex-row lg:flex-col gap-2 sm:gap-4 overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0">
               {categories.map((category) => {
                 // Hex rengi RGB'ye çevir
                 const hexToRgb = (hex) => {
@@ -286,7 +286,7 @@ const TableDetail = ({ user }) => {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl transition shadow-xl whitespace-nowrap lg:whitespace-normal flex-shrink-0 lg:flex-shrink ${
+                      className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl transition shadow-xl whitespace-nowrap flex-shrink-0 ${
                       isSelected
                         ? `${textColor} scale-105`
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -384,7 +384,7 @@ const TableDetail = ({ user }) => {
                          Bu kategoride ürün yok
                        </div>
                      ) : (
-                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2 overflow-y-auto flex-1 min-h-0">
+                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ gridAutoRows: 'minmax(80px, auto)' }}>
                 {products.map((product) => {
                   // Seçili kategorinin rengini bul
                   const currentCategory = categories.find(cat => cat.id === selectedCategory);
@@ -420,7 +420,9 @@ const TableDetail = ({ user }) => {
                         boxShadow: hasCustomColor 
                           ? `0 3px 15px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3), 0 1px 7px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
                           : '0 3px 5px -1px rgb(0 0 0 / 0.1), 0 1px 3px -2px rgb(0 0 0 / 0.1)',
-                        minHeight: '80px'
+                        minHeight: '80px',
+                        minWidth: '0',
+                        maxWidth: '100%'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
