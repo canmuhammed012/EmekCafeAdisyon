@@ -1016,14 +1016,37 @@ app.get('/api/print/test', (req, res) => {
 app.get('/api/printers/windows', (req, res) => {
   try {
     console.log('🔍 Windows yazıcıları aranıyor...');
-    const printers = printer.getPrinters();
+    console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
+    
+    let printers = [];
+    if (typeof printer.getPrinters === 'function') {
+      printers = printer.getPrinters();
+    } else if (typeof printer.list === 'function') {
+      printers = printer.list();
+    } else {
+      // Windows API kullanarak yazıcıları bul
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('wmic printer get name', { encoding: 'utf-8' });
+        const lines = output.split('\n').filter(line => line.trim() && line.trim() !== 'Name');
+        printers = lines.map((name, index) => ({
+          name: name.trim(),
+          isDefault: index === 0,
+          status: 'ready'
+        }));
+      } catch (winError) {
+        console.error('Windows yazıcı listesi alınamadı:', winError);
+        throw winError;
+      }
+    }
+    
     console.log('📋 Bulunan Windows yazıcıları:', printers.length);
     
-    const printerList = printers.map((printer, index) => ({
+    const printerList = printers.map((printerItem, index) => ({
       id: index,
-      name: printer.name,
-      status: printer.status,
-      isDefault: printer.isDefault || false,
+      name: printerItem.name || printerItem,
+      status: printerItem.status || 'ready',
+      isDefault: printerItem.isDefault || index === 0,
       type: 'windows'
     }));
     
@@ -1073,7 +1096,33 @@ app.post('/api/print/receipt', (req, res) => {
         try {
           // Windows yazıcılarını bul
           console.log('🔍 Windows yazıcıları aranıyor...');
-          const printers = printer.getPrinters();
+          console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
+          
+          // node-printer API'sini kontrol et
+          let printers = [];
+          if (typeof printer.getPrinters === 'function') {
+            printers = printer.getPrinters();
+          } else if (typeof printer.list === 'function') {
+            printers = printer.list();
+          } else if (printer && Array.isArray(printer)) {
+            printers = printer;
+          } else {
+            // Windows API kullanarak yazıcıları bul
+            try {
+              const { execSync } = require('child_process');
+              const output = execSync('wmic printer get name', { encoding: 'utf-8' });
+              const lines = output.split('\n').filter(line => line.trim() && line.trim() !== 'Name');
+              printers = lines.map((name, index) => ({
+                name: name.trim(),
+                isDefault: index === 0,
+                status: 'ready'
+              }));
+            } catch (winError) {
+              console.error('Windows yazıcı listesi alınamadı:', winError);
+              throw new Error('Yazıcı listesi alınamadı');
+            }
+          }
+          
           console.log('📋 Bulunan yazıcılar:', printers.length);
           
           if (!printers || printers.length === 0) {
@@ -1137,19 +1186,53 @@ app.post('/api/print/receipt', (req, res) => {
           
           // Windows yazıcıya yazdır
           console.log('✅ Yazıcıya yazdırılıyor:', selectedPrinter.name);
-          printer.printDirect({
-            data: receiptContent,
-            printer: selectedPrinter.name,
-            type: 'RAW',
-            success: (jobID) => {
-              console.log('✅ Yazdırma işi başlatıldı, Job ID:', jobID);
-              res.json({ success: true, message: 'Fiş başarıyla yazdırıldı', jobID });
-            },
-            error: (error) => {
-              console.error('❌ Yazdırma hatası:', error);
-              res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
+          
+          // node-printer API'sini kontrol et ve yazdır
+          if (typeof printer.printDirect === 'function') {
+            printer.printDirect({
+              data: receiptContent,
+              printer: selectedPrinter.name,
+              type: 'RAW',
+              success: (jobID) => {
+                console.log('✅ Yazdırma işi başlatıldı, Job ID:', jobID);
+                res.json({ success: true, message: 'Fiş başarıyla yazdırıldı', jobID });
+              },
+              error: (error) => {
+                console.error('❌ Yazdırma hatası:', error);
+                res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
+              }
+            });
+          } else {
+            // Alternatif: Windows print komutu kullan
+            try {
+              const fs = require('fs');
+              const path = require('path');
+              const { execSync } = require('child_process');
+              
+              // Geçici dosya oluştur
+              const tempFile = path.join(os.tmpdir(), `receipt_${Date.now()}.txt`);
+              fs.writeFileSync(tempFile, receiptContent, 'utf8');
+              
+              // Windows print komutu ile yazdır
+              execSync(`print /D:"${selectedPrinter.name}" "${tempFile}"`, { 
+                encoding: 'utf-8',
+                timeout: 10000
+              });
+              
+              // Geçici dosyayı sil
+              setTimeout(() => {
+                try {
+                  fs.unlinkSync(tempFile);
+                } catch (e) {}
+              }, 1000);
+              
+              console.log('✅ Yazdırma işi başlatıldı');
+              res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
+            } catch (printError) {
+              console.error('❌ Yazdırma hatası:', printError);
+              res.status(500).json({ error: 'Yazdırma hatası: ' + printError.message });
             }
-          });
+          }
         } catch (error) {
           console.error('❌ Genel yazdırma hatası:', error);
           res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
