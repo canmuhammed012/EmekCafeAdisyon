@@ -29,6 +29,9 @@ const TableDetail = ({ user }) => {
   // Masa değiştirme modalı için state
   const [showTableTransferModal, setShowTableTransferModal] = useState(false);
   const [tables, setTables] = useState([]);
+  
+  // Tıklanan ürün için glow efekti state
+  const [clickedProductId, setClickedProductId] = useState(null);
 
   // Fonksiyonları normal function olarak tanımla (useCallback'siz)
   const loadOrders = async () => {
@@ -177,6 +180,16 @@ const TableDetail = ({ user }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory]);
 
+  // Tıklanan ürün glow efektini kısa süre sonra temizle
+  useEffect(() => {
+    if (clickedProductId !== null) {
+      const timer = setTimeout(() => {
+        setClickedProductId(null);
+      }, 600); // 600ms sonra temizle
+      return () => clearTimeout(timer);
+    }
+  }, [clickedProductId]);
+
   const handleQuantityChange = async (orderId, newQuantity) => {
     if (newQuantity < 1) {
       handleDeleteOrder(orderId);
@@ -205,6 +218,9 @@ const TableDetail = ({ user }) => {
   };
 
   const handleAddProduct = async (productId) => {
+    // Glow efekti için state set et
+    setClickedProductId(productId);
+    
     try {
       // Mevcut siparişlerde bu ürün var mı kontrol et
       const existingOrder = orders.find(order => order.productId === productId);
@@ -468,6 +484,7 @@ const TableDetail = ({ user }) => {
                   const rgb = hexToRgb(productColor);
                   
                   const hasCustomColor = product.color && product.color !== '#FFFFFF';
+                  const isClicked = clickedProductId === product.id;
                   
                   return (
                     <div
@@ -476,9 +493,11 @@ const TableDetail = ({ user }) => {
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition-all duration-150 transform hover:scale-105 active:scale-95 flex items-center justify-center"
                       style={{
                         aspectRatio: '1.2 / 1',
-                        border: 'clamp(0.5px, 0.1vw, 1px) solid',
+                        border: `clamp(${isClicked ? '2px' : '0.5px'}, ${isClicked ? '0.3vw' : '0.1vw'}, ${isClicked ? '3px' : '1px'}) solid`,
                         borderColor: productColor,
-                        boxShadow: hasCustomColor 
+                        boxShadow: isClicked
+                          ? `0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(147, 51, 234, 0.6), 0 0 60px rgba(236, 72, 153, 0.4), 0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
+                          : hasCustomColor 
                           ? `0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), 0 0.5px 3px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`
                           : '0 1px 2px -1px rgb(0 0 0 / 0.08), 0 0.5px 1px -1px rgb(0 0 0 / 0.08)',
                         width: '100%',
