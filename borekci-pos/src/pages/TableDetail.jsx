@@ -388,10 +388,11 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px, 100%), 1fr))',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 180px))',
                          gap: 'clamp(0.5rem, 1vw, 1rem)',
                          gridAutoRows: 'minmax(0, 1fr)',
-                         padding: '0.25rem'
+                         padding: '0.25rem',
+                         justifyContent: 'start'
                        }}>
                 {products.map((product) => {
                   // Seçili kategorinin rengini bul
@@ -422,18 +423,19 @@ const TableDetail = ({ user }) => {
                       onClick={() => handleAddProduct(product.id)}
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
-                        aspectRatio: '1.4 / 1',
-                        border: 'clamp(2px, 0.2vw, 3px) solid',
+                        aspectRatio: '1.3 / 1',
+                        border: '3px solid',
                         borderColor: productColor,
                         boxShadow: hasCustomColor 
                           ? `0 4px 20px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4), 0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
                           : '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
                         width: '100%',
-                        height: '100%',
-                        minHeight: 'clamp(100px, 12vh, 180px)',
-                        padding: 'clamp(0.5rem, 1.2vw, 1rem)',
+                        maxWidth: '180px',
+                        minHeight: '120px',
+                        maxHeight: '160px',
+                        padding: '0.75rem',
                         overflow: 'hidden',
-                        borderRadius: 'clamp(0.5rem, 0.8vw, 0.75rem)'
+                        borderRadius: '0.75rem'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -454,7 +456,7 @@ const TableDetail = ({ user }) => {
                           maxHeight: '100%',
                           overflow: 'hidden',
                           padding: '0',
-                          gap: 'clamp(0.25rem, 0.6vw, 0.5rem)'
+                          gap: '0.375rem'
                         }}
                       >
                         {/* Ürün İsmi - Kesinlikle Taşmayacak */}
@@ -463,8 +465,8 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: 'clamp(0.75rem, 1.2vw + 0.2rem, 1.1rem)',
-                            lineHeight: '1.25',
+                            fontSize: '0.95rem',
+                            lineHeight: '1.3',
                             overflow: 'hidden',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
@@ -484,7 +486,7 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: 'clamp(0.85rem, 1.4vw + 0.2rem, 1.3rem)',
+                            fontSize: '1.1rem',
                             lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
