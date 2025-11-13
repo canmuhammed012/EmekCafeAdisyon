@@ -393,9 +393,9 @@ const TableDetail = ({ user }) => {
                        </div>
                      ) : (
                        <div className="grid overflow-y-auto overflow-x-hidden flex-1 min-h-0" style={{ 
-                         gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 180px))',
-                         gap: 'clamp(0.5rem, 1vw, 1rem)',
-                         gridAutoRows: 'minmax(0, 1fr)',
+                         gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(120px, 12vw, 180px), 1fr))',
+                         gap: 'clamp(0.375rem, 0.8vw, 0.75rem)',
+                         gridAutoRows: 'auto',
                          padding: '0.25rem',
                          justifyContent: 'start'
                        }}>
@@ -428,19 +428,17 @@ const TableDetail = ({ user }) => {
                       onClick={() => handleAddProduct(product.id)}
                       className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
-                        aspectRatio: '1.3 / 1',
-                        border: '3px solid',
+                        aspectRatio: '1.35 / 1',
+                        border: 'clamp(2px, 0.25vw, 3px) solid',
                         borderColor: productColor,
                         boxShadow: hasCustomColor 
                           ? `0 4px 20px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4), 0 2px 10px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`
                           : '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
                         width: '100%',
-                        maxWidth: '180px',
-                        minHeight: '120px',
-                        maxHeight: '160px',
-                        padding: '0.75rem',
+                        height: 'auto',
+                        padding: 'clamp(0.5rem, 1vw, 0.75rem)',
                         overflow: 'hidden',
-                        borderRadius: '0.75rem'
+                        borderRadius: 'clamp(0.5rem, 0.6vw, 0.75rem)'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -461,7 +459,7 @@ const TableDetail = ({ user }) => {
                           maxHeight: '100%',
                           overflow: 'hidden',
                           padding: '0',
-                          gap: '0.375rem'
+                          gap: 'clamp(0.25rem, 0.5vw, 0.375rem)'
                         }}
                       >
                         {/* Ürün İsmi - Kesinlikle Taşmayacak */}
@@ -470,7 +468,7 @@ const TableDetail = ({ user }) => {
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            fontSize: '0.95rem',
+                            fontSize: 'clamp(0.75rem, 1.1vw, 0.95rem)',
                             lineHeight: '1.3',
                             overflow: 'hidden',
                             display: '-webkit-box',
@@ -491,7 +489,7 @@ const TableDetail = ({ user }) => {
                             width: '100%',
                             maxWidth: '100%',
                             color: productColor,
-                            fontSize: '1.1rem',
+                            fontSize: 'clamp(0.85rem, 1.3vw, 1.1rem)',
                             lineHeight: '1.2',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -510,35 +508,50 @@ const TableDetail = ({ user }) => {
             </div>
 
             {/* Sağ taraf - Siparişler (Dikey Liste) */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(180px, 18vw, 250px)' }}>
-              <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Siparişler</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(160px, 16vw, 230px)' }}>
+              <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.95rem, 1.3vw, 1.25rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
-                <p className="text-center text-gray-600 dark:text-gray-400 py-6 text-sm sm:text-base">
+                <p className="text-center text-gray-600 dark:text-gray-400" style={{ padding: 'clamp(1rem, 2vw, 1.5rem)', fontSize: 'clamp(0.75rem, 1vw, 0.875rem)' }}>
                   Henüz sipariş yok
                 </p>
               ) : (
-                <div className="space-y-2 sm:space-y-3 flex-1 overflow-y-auto min-h-0">
+                <div className="flex-1 overflow-y-auto min-h-0" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 0.7vw, 0.75rem)' }}>
                   {orders.map((order) => (
                     <div
                       key={order.id}
-                      className="flex flex-col p-2 sm:p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                      className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                      style={{ 
+                        padding: 'clamp(0.5rem, 1vw, 0.75rem)',
+                        gap: 'clamp(0.25rem, 0.5vw, 0.5rem)'
+                      }}
                     >
                       {/* Ürün adı ve artı/eksi butonları */}
-                      <div className="flex items-center justify-between mb-1 sm:mb-2 gap-1 sm:gap-2">
-                        <h3 className="font-semibold text-xs sm:text-sm md:text-base text-gray-800 dark:text-white flex-1 break-words">
+                      <div className="flex items-center justify-between" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
+                        <h3 className="font-semibold text-gray-800 dark:text-white flex-1 break-words" style={{ 
+                          fontSize: 'clamp(0.75rem, 1vw, 0.875rem)',
+                          lineHeight: '1.3'
+                        }}>
                           {order.name}
                         </h3>
-                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        <div className="flex items-center flex-shrink-0" style={{ gap: 'clamp(0.25rem, 0.4vw, 0.375rem)' }}>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleQuantityChange(order.id, order.quantity - 1);
                             }}
-                            className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg text-base sm:text-lg md:text-xl font-bold flex items-center justify-center"
+                            className="bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold flex items-center justify-center"
+                            style={{
+                              width: 'clamp(1.75rem, 2.5vw, 2.5rem)',
+                              height: 'clamp(1.75rem, 2.5vw, 2.5rem)',
+                              fontSize: 'clamp(0.875rem, 1.2vw, 1.125rem)'
+                            }}
                           >
                             -
                           </button>
-                          <span className="w-8 sm:w-10 text-center font-bold text-sm sm:text-base md:text-lg text-gray-800 dark:text-white">
+                          <span className="text-center font-bold text-gray-800 dark:text-white" style={{ 
+                            minWidth: 'clamp(1.5rem, 2vw, 2rem)',
+                            fontSize: 'clamp(0.75rem, 1vw, 0.95rem)'
+                          }}>
                             {order.quantity}
                           </span>
                           <button
@@ -546,7 +559,12 @@ const TableDetail = ({ user }) => {
                               e.stopPropagation();
                               handleQuantityChange(order.id, order.quantity + 1);
                             }}
-                            className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 hover:bg-green-600 text-white rounded-lg text-base sm:text-lg md:text-xl font-bold flex items-center justify-center"
+                            className="bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold flex items-center justify-center"
+                            style={{
+                              width: 'clamp(1.75rem, 2.5vw, 2.5rem)',
+                              height: 'clamp(1.75rem, 2.5vw, 2.5rem)',
+                              fontSize: 'clamp(0.875rem, 1.2vw, 1.125rem)'
+                            }}
                           >
                             +
                           </button>
@@ -554,11 +572,11 @@ const TableDetail = ({ user }) => {
                       </div>
                       
                       {/* Fiyat bilgisi */}
-                      <div className="flex items-center justify-between mb-1 sm:mb-2">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center justify-between">
+                        <p className="text-gray-600 dark:text-gray-400" style={{ fontSize: 'clamp(0.7rem, 0.9vw, 0.8rem)' }}>
                           {order.price.toFixed(2)} ₺ x {order.quantity}
                         </p>
-                        <span className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400">
+                        <span className="font-bold text-blue-600 dark:text-blue-400" style={{ fontSize: 'clamp(0.8rem, 1vw, 0.95rem)' }}>
                           {order.total.toFixed(2)} ₺
                         </span>
                       </div>
@@ -569,7 +587,11 @@ const TableDetail = ({ user }) => {
                           e.stopPropagation();
                           handleDeleteOrder(order.id);
                         }}
-                        className="w-full py-1.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center justify-center"
+                        style={{
+                          padding: 'clamp(0.375rem, 0.6vw, 0.5rem)',
+                          fontSize: 'clamp(0.7rem, 0.9vw, 0.8rem)'
+                        }}
                       >
                         Sil
                       </button>
