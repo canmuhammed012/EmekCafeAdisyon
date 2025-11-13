@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.0.71",
+  "version": "1.0.72",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -68,6 +68,10 @@
     "asarUnpack": [
       "**/node_modules/sqlite3/**/*",
       "**/node_modules/usb/**/*",
+      "**/node_modules/node-printer/**/*",
+      "**/node_modules/escpos/**/*",
+      "**/node_modules/escpos-usb/**/*",
+      "server.js",
       "dist/**/*"
     ],
     "files": [
