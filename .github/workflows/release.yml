@@ -44,33 +44,39 @@ jobs:
       run: |
         $releasePath = "borekci-pos\release"
         $version = "${{ github.ref_name }}".Replace("v", "")
-        $exeFile = "Emek Cafe Adisyon Setup $version.exe"
-        $exePath = Join-Path $releasePath $exeFile
         $latestYml = Join-Path $releasePath "latest.yml"
         
-        Write-Host "Checking paths:"
-        Write-Host "  Exe: $exePath (exists: $(Test-Path $exePath))"
+        # Find the actual .exe file in release folder (Electron Builder creates it with dots)
+        $exeFiles = Get-ChildItem -Path $releasePath -Filter "*.exe" | Where-Object { $_.Name -like "*Setup*$version*" }
         
-        if (Test-Path $exePath) {
-          $fileSize = (Get-Item $exePath).Length
-          $releaseDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
-          
-          # Calculate SHA512 hash directly from the .exe file
-          Write-Host "Calculating SHA512 hash of .exe file..."
-          $sha512Hash = Get-FileHash -Path $exePath -Algorithm SHA512
-          $sha512 = $sha512Hash.Hash.ToLower()
-          Write-Host "SHA512: $sha512"
-          
-          # latest.yml content
-          $content = "version: $version`nfiles:`n  - url: $exeFile`n    sha512: $sha512`n    size: $fileSize`npath: $exeFile`nsha512: $sha512`nreleaseDate: $releaseDate"
-          $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
-          Write-Host "latest.yml created successfully!"
-          Write-Host "Content:"
-          Get-Content $latestYml
-        } else {
-          Write-Host "ERROR: Exe file not found: $exePath"
+        if ($exeFiles.Count -eq 0) {
+          Write-Host "ERROR: No .exe file found in $releasePath"
+          Write-Host "Files in release folder:"
+          Get-ChildItem -Path $releasePath | Select-Object Name
           exit 1
         }
+        
+        $exeFile = $exeFiles[0].Name
+        $exePath = $exeFiles[0].FullName
+        
+        Write-Host "Found exe file: $exeFile"
+        Write-Host "Full path: $exePath"
+        
+        $fileSize = (Get-Item $exePath).Length
+        $releaseDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
+        
+        # Calculate SHA512 hash directly from the .exe file
+        Write-Host "Calculating SHA512 hash of .exe file..."
+        $sha512Hash = Get-FileHash -Path $exePath -Algorithm SHA512
+        $sha512 = $sha512Hash.Hash.ToLower()
+        Write-Host "SHA512: $sha512"
+        
+        # latest.yml content - use the actual file name
+        $content = "version: $version`nfiles:`n  - url: $exeFile`n    sha512: $sha512`n    size: $fileSize`npath: $exeFile`nsha512: $sha512`nreleaseDate: $releaseDate"
+        $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
+        Write-Host "latest.yml created successfully!"
+        Write-Host "Content:"
+        Get-Content $latestYml
       shell: powershell
       continue-on-error: false
     

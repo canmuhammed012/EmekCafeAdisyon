@@ -128,7 +128,7 @@ const Tables = ({ user, onLogout }) => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 mx-2 sm:mx-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-4">
             {tables.map((table) => {
               const isDolu = table.status === 'dolu';
               const isBos = table.status === 'boş';
@@ -137,7 +137,7 @@ const Tables = ({ user, onLogout }) => {
                 <div
                   key={table.id}
                   onClick={() => navigate(`/table/${table.id}`)}
-                  className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 sm:p-4 md:p-6 cursor-pointer hover:shadow-2xl transition transform hover:scale-105 overflow-hidden border-4 min-h-[140px] sm:min-h-[160px] md:min-h-[180px] ${
+                  className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-3 md:p-4 cursor-pointer hover:shadow-2xl transition transform hover:scale-105 overflow-hidden border-2 min-h-[100px] sm:min-h-[110px] md:min-h-[120px] ${
                     isDolu ? 'border-red-500' : isBos ? 'border-green-500' : 'border-gray-400'
                   }`}
                 >
@@ -155,13 +155,13 @@ const Tables = ({ user, onLogout }) => {
                   
                   {/* İçerik */}
                   <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2 sm:mb-3">
-                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                      <h3 className="text-sm sm:text-base md:text-lg font-bold text-gray-800 dark:text-white">
                         {table.name}
                       </h3>
-                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${getStatusColor(table.status)}`}></div>
+                      <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${getStatusColor(table.status)}`}></div>
                     </div>
-                    <p className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    <p className="text-base sm:text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
                       {table.total ? table.total.toFixed(2) : '0.00'} ₺
                     </p>
                   </div>
