@@ -1254,12 +1254,16 @@ app.post('/api/print/receipt', (req, res) => {
               return;
             }
           } else {
-            // POS-80 veya benzeri yazıcıları öncelikle ara
-            selectedPrinter = printers.find(p => 
-              p.name.toLowerCase().includes('pos') || 
-              p.name.toLowerCase().includes('80') ||
-              p.name.toLowerCase().includes('q900')
-            );
+            // XP-80, POS-80 veya benzeri yazıcıları öncelikle ara
+            selectedPrinter = printers.find(p => {
+              const name = p.name.toLowerCase();
+              return name.includes('xp-80') || 
+                     name.includes('pos-80') || 
+                     name.includes('xp80') || 
+                     name.includes('pos80') ||
+                     (name.includes('pos') && name.includes('80')) ||
+                     name.includes('q900');
+            });
             
             // Bulunamazsa varsayılan yazıcıyı veya ilk yazıcıyı kullan
             if (!selectedPrinter) {
