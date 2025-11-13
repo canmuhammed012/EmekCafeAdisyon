@@ -24,10 +24,10 @@ function createWindow() {
   const minWidth = Math.max(800, Math.floor(width * 0.6));
   const minHeight = Math.max(600, Math.floor(height * 0.6));
   
-  // Icon path'i belirle
+  // Icon path'i belirle (Windows için .ico, diğer platformlar için .png)
   const iconPath = app.isPackaged 
-    ? path.join(process.resourcesPath, 'public', 'logo.png')
-    : path.join(__dirname, '..', 'public', 'logo.png');
+    ? path.join(process.resourcesPath, 'public', 'logo.ico')
+    : path.join(__dirname, '..', 'public', 'logo.ico');
   
   mainWindow = new BrowserWindow({
     width: windowWidth,
