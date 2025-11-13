@@ -7,6 +7,7 @@ const cors = require('cors');
 const os = require('os');
 const escpos = require('escpos');
 const escposUSB = require('escpos-usb');
+const usb = require('usb');
 
 const app = express();
 const server = http.createServer(app);
@@ -953,16 +954,45 @@ app.get('/api/printers', (req, res) => {
   try {
     const printerList = [];
     
-    // USB yazıcıları bul
-    const usbDevices = escposUSB.find();
+    // USB yazıcıları bul - escpos-usb paketinin doğru API'sini kullan
+    let usbDevices = [];
+    
+    try {
+      // escpos-usb paketinin farklı API versiyonlarını dene
+      if (typeof escposUSB.find === 'function') {
+        usbDevices = escposUSB.find();
+      } else if (escposUSB.device && typeof escposUSB.device.find === 'function') {
+        usbDevices = escposUSB.device.find();
+      } else {
+        // usb paketi ile manuel arama
+        const allDevices = usb.getDeviceList();
+        // ESC/POS yazıcıları için yaygın vendor ID'leri filtrele
+        usbDevices = allDevices.filter(device => {
+          const descriptor = device.deviceDescriptor;
+          // Yaygın ESC/POS yazıcı vendor ID'leri (Xprinter, Epson, Star, vb.)
+          const commonVendorIds = [0x04f9, 0x0483, 0x1504, 0x154f, 0x04e8];
+          return commonVendorIds.includes(descriptor.idVendor);
+        });
+      }
+    } catch (findError) {
+      console.error('USB cihaz bulma hatası:', findError);
+      // usb paketi ile fallback
+      try {
+        const allDevices = usb.getDeviceList();
+        usbDevices = allDevices.slice(0, 5); // İlk 5 cihazı al
+      } catch (usbError) {
+        console.error('USB paketi hatası:', usbError);
+      }
+    }
     
     if (usbDevices && usbDevices.length > 0) {
       usbDevices.forEach((device, index) => {
+        const descriptor = device.deviceDescriptor || device;
         printerList.push({
           id: index,
-          name: device.deviceDescriptor?.iProduct || `USB Yazıcı ${index + 1}`,
-          vendorId: device.deviceDescriptor?.idVendor,
-          productId: device.deviceDescriptor?.idProduct,
+          name: descriptor.iProduct || `USB Yazıcı ${index + 1}`,
+          vendorId: descriptor.idVendor,
+          productId: descriptor.idProduct,
           type: 'usb'
         });
       });
@@ -1011,9 +1041,42 @@ app.post('/api/print/receipt', (req, res) => {
         
         try {
           // USB yazıcıları bul
-          const usbDevices = escposUSB.find();
+          console.log('🔍 USB yazıcıları aranıyor...');
+          let usbDevices = [];
+          
+          try {
+            // escpos-usb paketinin farklı API versiyonlarını dene
+            if (typeof escposUSB.find === 'function') {
+              usbDevices = escposUSB.find();
+            } else if (escposUSB.device && typeof escposUSB.device.find === 'function') {
+              usbDevices = escposUSB.device.find();
+            } else {
+              // usb paketi ile manuel arama
+              const allDevices = usb.getDeviceList();
+              // ESC/POS yazıcıları için yaygın vendor ID'leri filtrele
+              usbDevices = allDevices.filter(device => {
+                const descriptor = device.deviceDescriptor;
+                // Yaygın ESC/POS yazıcı vendor ID'leri
+                const commonVendorIds = [0x04f9, 0x0483, 0x1504, 0x154f, 0x04e8];
+                return commonVendorIds.includes(descriptor.idVendor);
+              });
+            }
+          } catch (findError) {
+            console.error('USB cihaz bulma hatası:', findError);
+            // usb paketi ile fallback - tüm cihazları göster
+            try {
+              const allDevices = usb.getDeviceList();
+              usbDevices = allDevices.slice(0, 5); // İlk 5 cihazı al
+              console.log('⚠️ Fallback: Tüm USB cihazları listeleniyor');
+            } catch (usbError) {
+              console.error('USB paketi hatası:', usbError);
+            }
+          }
+          
+          console.log('📋 Bulunan USB cihazları:', usbDevices ? usbDevices.length : 0);
           
           if (!usbDevices || usbDevices.length === 0) {
+            console.error('❌ USB yazıcı bulunamadı');
             res.status(404).json({ error: 'USB yazıcı bulunamadı. Lütfen yazıcınızın bağlı olduğundan emin olun.' });
             return;
           }
@@ -1026,65 +1089,115 @@ app.post('/api/print/receipt', (req, res) => {
             return;
           }
           
-          const usbDevice = new escposUSB.USB(usbDevices[selectedPrinterIndex]);
+          console.log('🖨️ Yazıcı seçildi:', selectedPrinterIndex);
+          const selectedDevice = usbDevices[selectedPrinterIndex];
+          console.log('📦 Cihaz bilgileri:', {
+            vendorId: selectedDevice.deviceDescriptor?.idVendor || selectedDevice.idVendor,
+            productId: selectedDevice.deviceDescriptor?.idProduct || selectedDevice.idProduct
+          });
+          
+          // escpos-usb device oluştur
+          let usbDevice;
+          try {
+            // Farklı API versiyonlarını dene
+            if (escposUSB.USB) {
+              usbDevice = new escposUSB.USB(selectedDevice);
+            } else if (escposUSB.device) {
+              usbDevice = new escposUSB.device(selectedDevice);
+            } else if (escposUSB.createDevice) {
+              usbDevice = escposUSB.createDevice(selectedDevice);
+            } else {
+              // Direkt device objesini kullan
+              usbDevice = selectedDevice;
+            }
+          } catch (deviceError) {
+            console.error('❌ Yazıcı device oluşturma hatası:', deviceError);
+            res.status(500).json({ error: 'Yazıcı bağlantısı kurulamadı: ' + deviceError.message });
+            return;
+          }
+          
           const printer = new escpos.Printer(usbDevice);
           
           // Yazdırma işlemi
+          console.log('✅ Yazıcı açılıyor...');
           usbDevice.open((error) => {
             if (error) {
-              console.error('Yazıcı açılamadı:', error);
+              console.error('❌ Yazıcı açılamadı:', error);
               res.status(500).json({ error: 'Yazıcı açılamadı: ' + error.message });
               return;
             }
             
-            // Fiş formatla ve yazdır
-            printer
-              .font('a')
-              .align('ct')
-              .size(1, 1)
-              .text(restaurantName)
-              .size(0, 0)
-              .feed(1)
-              .text('--------------------------------')
-              .align('lt')
-              .text(`Masa: ${table.name}`)
-              .text(`Tarih: ${new Date().toLocaleString('tr-TR')}`)
-              .text('--------------------------------');
+            console.log('✅ Yazıcı açıldı, yazdırma başlıyor...');
             
-            // Siparişleri yazdır
-            orders.forEach((order) => {
-              const line = `${order.name} x${order.quantity}`;
-              const price = `${order.total.toFixed(2)} ₺`;
-              const spaces = 32 - line.length - price.length;
-              const spacesStr = ' '.repeat(Math.max(0, spaces));
-              printer.text(`${line}${spacesStr}${price}`);
-            });
-            
-            printer
-              .text('--------------------------------')
-              .align('rt')
-              .text(`TOPLAM: ${table.total.toFixed(2)} ₺`)
-              .align('lt')
-              .feed(2)
-              .text('--------------------------------')
-              .align('ct')
-              .text('Nişanca Mahallesi Türkeli Caddesi,')
-              .text('Kumkapı 70/B, 34130 Fatih/İstanbul')
-              .feed(1)
-              .text('(0212) 516 54 86')
-              .feed(1)
-              .text('Bizi tercih ettiğiniz için')
-              .text('teşekkür ederiz!')
-              .feed(3)
-              .cut();
-            
-            // Yazdırmayı tamamla ve kapat
-            printer.flush(() => {
-              usbDevice.close(() => {
-                console.log('✅ Fiş başarıyla yazdırıldı');
-                res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
+            try {
+              // Fiş formatla ve yazdır
+              printer
+                .font('a')
+                .align('ct')
+                .size(1, 1)
+                .text(restaurantName)
+                .size(0, 0)
+                .feed(1)
+                .text('--------------------------------')
+                .align('lt')
+                .text(`Masa: ${table.name}`)
+                .text(`Tarih: ${new Date().toLocaleString('tr-TR')}`)
+                .text('--------------------------------');
+              
+              // Siparişleri yazdır
+              orders.forEach((order) => {
+                const line = `${order.name} x${order.quantity}`;
+                const price = `${order.total.toFixed(2)} ₺`;
+                const spaces = 32 - line.length - price.length;
+                const spacesStr = ' '.repeat(Math.max(0, spaces));
+                printer.text(`${line}${spacesStr}${price}`);
               });
-            });
+              
+              printer
+                .text('--------------------------------')
+                .align('rt')
+                .text(`TOPLAM: ${table.total.toFixed(2)} ₺`)
+                .align('lt')
+                .feed(2)
+                .text('--------------------------------')
+                .align('ct')
+                .text('Nişanca Mahallesi Türkeli Caddesi,')
+                .text('Kumkapı 70/B, 34130 Fatih/İstanbul')
+                .feed(1)
+                .text('(0212) 516 54 86')
+                .feed(1)
+                .text('Bizi tercih ettiğiniz için')
+                .text('teşekkür ederiz!')
+                .feed(3)
+                .cut();
+              
+              // Yazdırmayı tamamla ve kapat
+              printer.flush((flushError) => {
+                if (flushError) {
+                  console.error('❌ Flush hatası:', flushError);
+                  try {
+                    usbDevice.close(() => {});
+                  } catch (e) {}
+                  res.status(500).json({ error: 'Yazdırma tamamlanamadı: ' + flushError.message });
+                  return;
+                }
+                
+                console.log('✅ Yazdırma tamamlandı, yazıcı kapatılıyor...');
+                usbDevice.close((closeError) => {
+                  if (closeError) {
+                    console.error('⚠️ Yazıcı kapatma hatası:', closeError);
+                  }
+                  console.log('✅ Fiş başarıyla yazdırıldı');
+                  res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
+                });
+              });
+            } catch (printError) {
+              console.error('❌ Yazdırma hatası:', printError);
+              try {
+                usbDevice.close(() => {});
+              } catch (e) {}
+              res.status(500).json({ error: 'Yazdırma hatası: ' + printError.message });
+            }
           });
         } catch (error) {
           console.error('Yazdırma hatası:', error);

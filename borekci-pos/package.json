@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.0.62",
+  "version": "1.0.63",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -41,6 +41,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.7",
+    "usb": "^2.12.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
