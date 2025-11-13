@@ -1275,16 +1275,21 @@ app.post('/api/print/receipt', (req, res) => {
           
           console.log('🖨️ Seçilen yazıcı:', selectedPrinter.name);
           
-          // Fiş içeriğini DÜZ METİN olarak oluştur (ESC/POS yerine)
+          // Fiş içeriğini ESC/POS formatında oluştur (POS-80 ESC/POS yazıcı için)
           let receiptContent = '';
-          receiptContent += `\n\n`;
-          receiptContent += `        ${restaurantName}\n`;
-          receiptContent += `\n`;
-          receiptContent += `--------------------------------\n`;
+          
+          // ESC/POS komutları
+          receiptContent += '\x1B\x40'; // Initialize printer
+          receiptContent += '\x1B\x61\x01'; // Center align
+          receiptContent += '\x1B\x21\x30'; // Double height and width
+          receiptContent += `${restaurantName}\n`;
+          receiptContent += '\x1B\x21\x00'; // Normal text
+          receiptContent += '\x1B\x61\x00'; // Left align
+          receiptContent += '--------------------------------\n';
           receiptContent += `Masa: ${table.name}\n`;
           receiptContent += `Tarih: ${new Date().toLocaleString('tr-TR')}\n`;
-          receiptContent += `--------------------------------\n`;
-          receiptContent += `\n`;
+          receiptContent += '--------------------------------\n';
+          receiptContent += '\n';
           
           // Siparişleri yazdır
           orders.forEach((order) => {
@@ -1294,20 +1299,23 @@ app.post('/api/print/receipt', (req, res) => {
             receiptContent += `${line}${' '.repeat(Math.max(0, spaces))}${price}\n`;
           });
           
-          receiptContent += `--------------------------------\n`;
-          receiptContent += `\n`;
-          receiptContent += `                    TOPLAM: ${table.total.toFixed(2)} ₺\n`;
-          receiptContent += `\n`;
-          receiptContent += `--------------------------------\n`;
-          receiptContent += `\n`;
-          receiptContent += `        Nişanca Mahallesi Türkeli Caddesi,\n`;
-          receiptContent += `        Kumkapı 70/B, 34130 Fatih/İstanbul\n`;
-          receiptContent += `\n`;
-          receiptContent += `        (0212) 516 54 86\n`;
-          receiptContent += `\n`;
-          receiptContent += `        Bizi tercih ettiğiniz için\n`;
-          receiptContent += `        teşekkür ederiz!\n`;
-          receiptContent += `\n\n\n`;
+          receiptContent += '--------------------------------\n';
+          receiptContent += '\x1B\x61\x02'; // Right align
+          receiptContent += `TOPLAM: ${table.total.toFixed(2)} ₺\n`;
+          receiptContent += '\x1B\x61\x00'; // Left align
+          receiptContent += '\n';
+          receiptContent += '--------------------------------\n';
+          receiptContent += '\n';
+          receiptContent += '\x1B\x61\x01'; // Center align
+          receiptContent += 'Nişanca Mahallesi Türkeli Caddesi,\n';
+          receiptContent += 'Kumkapı 70/B, 34130 Fatih/İstanbul\n';
+          receiptContent += '\n';
+          receiptContent += '(0212) 516 54 86\n';
+          receiptContent += '\n';
+          receiptContent += 'Bizi tercih ettiğiniz için\n';
+          receiptContent += 'teşekkür ederiz!\n';
+          receiptContent += '\n\n\n';
+          receiptContent += '\x1D\x56\x00'; // Cut paper
           
           // EN BASİT YÖNTEM: Windows print komutu ile yazdır
           const fs = require('fs');
