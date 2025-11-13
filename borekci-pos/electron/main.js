@@ -455,8 +455,23 @@ if (app.isPackaged) {
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded', info.version);
     }
-    // Kullanıcıya sor - otomatik yükleme yerine
-    // autoUpdater.quitAndInstall();
+    
+    // Kullanıcıya dialog göster
+    const { dialog } = require('electron');
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Güncelleme Hazır',
+      message: `Yeni sürüm (${info.version}) indirildi!`,
+      detail: 'Uygulamayı yeniden başlatmak için Tamam\'a tıklayın. Güncelleme otomatik olarak kurulacaktır.',
+      buttons: ['Tamam', 'Sonra'],
+      defaultId: 0,
+      cancelId: 1
+    }).then((result) => {
+      if (result.response === 0) {
+        // Kullanıcı Tamam'a tıkladı - uygulamayı yeniden başlat ve güncellemeyi kur
+        autoUpdater.quitAndInstall(false, true);
+      }
+    });
   });
   
   autoUpdater.on('error', (error) => {
