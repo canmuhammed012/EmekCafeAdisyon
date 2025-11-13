@@ -1311,6 +1311,25 @@ app.post('/api/print/receipt', (req, res) => {
           // Windows yazıcıya yazdır
           console.log('✅ Yazıcıya yazdırılıyor:', selectedPrinter.name);
           
+          // Önce yazıcının gerçekten var olup olmadığını kontrol et
+          try {
+            const { execSync } = require('child_process');
+            console.log('🔍 Yazıcı durumu kontrol ediliyor...');
+            // Yazıcı adındaki tek tırnakları escape et
+            const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''");
+            // Yazıcının durumunu kontrol et
+            const checkOutput = execSync(`powershell -Command "Get-Printer -Name '${escapedPrinterName}' -ErrorAction Stop | Select-Object Name, PrinterStatus"`, {
+              encoding: 'utf-8',
+              timeout: 3000,
+              shell: true
+            });
+            console.log('✅ Yazıcı bulundu ve hazır:', checkOutput);
+          } catch (checkError) {
+            console.error('❌ Yazıcı kontrolü başarısız:', checkError.message);
+            res.status(404).json({ error: `Yazıcı bulunamadı veya hazır değil: ${selectedPrinter.name}` });
+            return;
+          }
+          
           // node-printer API'sini kontrol et ve yazdır
           if (typeof printer.printDirect === 'function') {
             printer.printDirect({
@@ -1337,23 +1356,92 @@ app.post('/api/print/receipt', (req, res) => {
               const tempFile = path.join(os.tmpdir(), `receipt_${Date.now()}.txt`);
               fs.writeFileSync(tempFile, receiptContent, 'utf8');
               
-              // Windows print komutu ile yazdır
-              execSync(`print /D:"${selectedPrinter.name}" "${tempFile}"`, { 
-                encoding: 'utf-8',
-                timeout: 10000
-              });
+              console.log('📄 Geçici dosya oluşturuldu:', tempFile);
+              
+              // Windows print komutu ile yazdır (stderr'ı da kontrol et)
+              let printResult = '';
+              try {
+                printResult = execSync(`print /D:"${selectedPrinter.name}" "${tempFile}"`, { 
+                  encoding: 'utf-8',
+                  timeout: 10000,
+                  shell: true,
+                  stdio: ['pipe', 'pipe', 'pipe'] // stdin, stdout, stderr
+                });
+                console.log('📋 Print komutu çıktısı:', printResult);
+              } catch (execError) {
+                const printErrorMsg = execError.message || execError.toString();
+                console.error('❌ Print komutu hatası:', printErrorMsg);
+                
+                // Geçici dosyayı temizle
+                try {
+                  if (fs.existsSync(tempFile)) {
+                    fs.unlinkSync(tempFile);
+                  }
+                } catch (e) {}
+                
+                res.status(500).json({ error: 'Yazdırma hatası: ' + printErrorMsg });
+                return;
+              }
+              
+              // Print komutunun çıktısını kontrol et
+              if (printResult && (printResult.toLowerCase().includes('error') || printResult.toLowerCase().includes('cannot'))) {
+                console.error('❌ Print komutu hata mesajı içeriyor:', printResult);
+                // Geçici dosyayı temizle
+                try {
+                  if (fs.existsSync(tempFile)) {
+                    fs.unlinkSync(tempFile);
+                  }
+                } catch (e) {}
+                res.status(500).json({ error: 'Yazdırma başarısız: ' + printResult });
+                return;
+              }
+              
+              // Yazıcı kuyruğunu kontrol et (yazdırma işinin gerçekten eklendiğini doğrula)
+              try {
+                const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''");
+                const queueCheck = execSync(`powershell -Command "Get-PrintJob -PrinterName '${escapedPrinterName}' -ErrorAction SilentlyContinue | Select-Object -First 1"`, {
+                  encoding: 'utf-8',
+                  timeout: 2000,
+                  shell: true
+                });
+                if (queueCheck && queueCheck.trim().length > 0) {
+                  console.log('✅ Yazdırma işi kuyruğa eklendi');
+                } else {
+                  console.warn('⚠️ Yazdırma kuyruğu boş (yazıcı yok veya hazır değil olabilir)');
+                }
+              } catch (queueError) {
+                console.warn('⚠️ Yazdırma kuyruğu kontrol edilemedi:', queueError.message);
+                // Bu bir hata değil, sadece uyarı
+              }
               
               // Geçici dosyayı sil
               setTimeout(() => {
                 try {
-                  fs.unlinkSync(tempFile);
-                } catch (e) {}
-              }, 1000);
+                  if (fs.existsSync(tempFile)) {
+                    fs.unlinkSync(tempFile);
+                    console.log('🗑️ Geçici dosya silindi');
+                  }
+                } catch (e) {
+                  console.warn('⚠️ Geçici dosya silinemedi:', e.message);
+                }
+              }, 2000);
               
               console.log('✅ Yazdırma işi başlatıldı');
               res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
             } catch (printError) {
               console.error('❌ Yazdırma hatası:', printError);
+              // Geçici dosyayı temizle
+              try {
+                const fs = require('fs');
+                const path = require('path');
+                const files = fs.readdirSync(os.tmpdir());
+                const receiptFiles = files.filter(f => f.startsWith('receipt_') && f.endsWith('.txt'));
+                receiptFiles.forEach(file => {
+                  try {
+                    fs.unlinkSync(path.join(os.tmpdir(), file));
+                  } catch (e) {}
+                });
+              } catch (e) {}
               res.status(500).json({ error: 'Yazdırma hatası: ' + printError.message });
             }
           }
