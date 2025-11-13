@@ -327,7 +327,15 @@ if (app.isPackaged) {
   setTimeout(() => {
     console.log('🔍 Güncelleme kontrol ediliyor...');
     console.log('📡 Feed URL:', autoUpdater.getFeedURL());
-    autoUpdater.checkForUpdates();
+    console.log('📦 Mevcut versiyon:', app.getVersion());
+    console.log('🔧 Auto-updater ayarları:', {
+      provider: 'github',
+      owner: 'canmuhammed012',
+      repo: 'EmekCafeAdisyon'
+    });
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('❌ Güncelleme kontrol hatası:', err);
+    });
   }, 5000);
   
   // Her 30 dakikada bir kontrol et

@@ -260,11 +260,11 @@ const TableDetail = ({ user }) => {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-hidden">
       <div className="flex-1 pt-4 overflow-hidden">
         {/* Menu Section */}
-        <div className="flex gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
-          {/* Categories - Sol tarafta, en üste kadar */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 min-w-[150px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[240px] xl:min-w-[280px] self-start flex-shrink-0 overflow-y-auto max-h-[calc(100vh-80px)] sm:max-h-[calc(100vh-100px)]">
+        <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
+          {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[180px] xl:min-w-[220px] 2xl:min-w-[260px] lg:flex-shrink-0 overflow-y-auto lg:max-h-[calc(100vh-100px)] max-h-[200px] lg:max-h-none">
             <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white">Kategoriler</h2>
-            <div className="flex flex-col gap-2 sm:gap-4">
+            <div className="flex flex-row lg:flex-col gap-2 sm:gap-4 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0">
               {categories.map((category) => {
                 // Hex rengi RGB'ye çevir
                 const hexToRgb = (hex) => {
@@ -286,14 +286,15 @@ const TableDetail = ({ user }) => {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`relative overflow-hidden px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-6 rounded-lg text-left font-bold text-sm sm:text-base md:text-lg lg:text-xl transition shadow-xl ${
+                    className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl transition shadow-xl whitespace-nowrap lg:whitespace-normal flex-shrink-0 lg:flex-shrink ${
                       isSelected
                         ? `${textColor} scale-105`
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                     style={{
                       borderLeft: `6px solid ${category.color}`,
-                      minHeight: '50px',
+                      minHeight: '40px',
+                      minWidth: '120px',
                       backgroundColor: isSelected ? category.color : undefined,
                     }}
                   >
@@ -314,7 +315,7 @@ const TableDetail = ({ user }) => {
           </div>
 
                  {/* Orta ve Sağ taraf - Ürünler ve Siparişler */}
-                 <div className="flex-1 flex gap-2 sm:gap-4 min-w-0 overflow-hidden">
+                 <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden">
                    {/* Orta - Header ve Ürünler */}
                    <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden">
                      {/* Header */}
@@ -448,7 +449,7 @@ const TableDetail = ({ user }) => {
             </div>
 
                  {/* Sağ taraf - Siparişler (Dikey Liste) */}
-                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 min-w-[150px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[240px] xl:min-w-[280px] 2xl:min-w-[320px] flex-shrink-0 flex flex-col overflow-hidden">
+                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 w-full lg:w-auto lg:min-w-[200px] xl:min-w-[240px] 2xl:min-w-[280px] lg:flex-shrink-0 flex flex-col overflow-hidden lg:max-h-[calc(100vh-100px)] max-h-[300px] lg:max-h-none">
                    <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2 sm:mb-3 md:mb-4 text-gray-800 dark:text-white flex-shrink-0">Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400 py-6 text-sm sm:text-base">
