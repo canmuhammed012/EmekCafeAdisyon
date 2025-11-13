@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder } from '../services/api';
+import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables } from '../services/api';
 import { getExchangeRates, convertWithDiscount } from '../services/currency';
 import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import Footer from '../components/Footer';
@@ -25,6 +25,10 @@ const TableDetail = ({ user }) => {
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [paymentType, setPaymentType] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
+  
+  // Masa değiştirme modalı için state
+  const [showTableTransferModal, setShowTableTransferModal] = useState(false);
+  const [tables, setTables] = useState([]);
 
   // Fonksiyonları normal function olarak tanımla (useCallback'siz)
   const loadOrders = async () => {
@@ -250,6 +254,35 @@ const TableDetail = ({ user }) => {
     navigate('/');
   };
 
+  // Masa değiştirme fonksiyonu
+  const handleTableTransfer = async (toTableId) => {
+    try {
+      await transferOrders(parseInt(id), parseInt(toTableId));
+      setShowTableTransferModal(false);
+      // Yeni masaya yönlendir
+      navigate(`/table/${toTableId}`);
+    } catch (error) {
+      console.error('Masa değiştirme hatası:', error);
+      alert(error.response?.data?.error || 'Masa değiştirme başarısız oldu');
+    }
+  };
+
+  // Masa listesini yükle
+  const loadTables = async () => {
+    try {
+      const response = await getTables();
+      setTables(response.data || []);
+    } catch (error) {
+      console.error('Masalar yüklenemedi:', error);
+    }
+  };
+
+  // Modal açıldığında masaları yükle
+  const handleOpenTableTransferModal = () => {
+    setShowTableTransferModal(true);
+    loadTables();
+  };
+
 
   const total = orders.reduce((sum, order) => sum + order.total, 0);
 
@@ -332,10 +365,19 @@ const TableDetail = ({ user }) => {
                    <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ flexBasis: 'auto', minWidth: 0, maxWidth: '80%', height: '100%' }}>
                      {/* Header */}
                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 flex-shrink-0">
-                       <div>
+                       <div className="flex flex-col gap-2">
                          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
                            Masa {id} - Siparişler
                          </h1>
+                         {orders.length > 0 && (
+                           <button
+                             onClick={handleOpenTableTransferModal}
+                             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-2 px-3 sm:px-4 rounded-lg transition text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
+                           >
+                             <span>🔄</span>
+                             <span>Masa Değiştir</span>
+                           </button>
+                         )}
                        </div>
                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
                          {orders.length > 0 && (
@@ -636,6 +678,59 @@ const TableDetail = ({ user }) => {
               className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-2xl transition shadow-lg"
             >
               Tamam
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Masa Değiştirme Modalı */}
+      {showTableTransferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 max-w-2xl w-full mx-4">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+              Masa Değiştir - Masa {id}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Siparişleri taşımak istediğiniz masayı seçin:
+            </p>
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3 max-h-96 overflow-y-auto">
+              {tables
+                .filter(table => table.id !== parseInt(id))
+                .map((table) => {
+                  const isDolu = table.status === 'dolu';
+                  const isBos = table.status === 'boş';
+                  return (
+                    <button
+                      key={table.id}
+                      onClick={() => handleTableTransfer(table.id)}
+                      className={`p-4 rounded-lg shadow-md transition transform hover:scale-105 border-2 ${
+                        isDolu 
+                          ? 'bg-red-50 dark:bg-red-900/20 border-red-500' 
+                          : isBos 
+                          ? 'bg-green-50 dark:bg-green-900/20 border-green-500' 
+                          : 'bg-gray-50 dark:bg-gray-700 border-gray-400'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className={`w-3 h-3 rounded-full mx-auto mb-2 ${
+                          isDolu ? 'bg-red-500' : isBos ? 'bg-green-500' : 'bg-gray-400'
+                        }`}></div>
+                        <p className="font-bold text-gray-800 dark:text-white text-sm">
+                          {table.name}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {table.total ? table.total.toFixed(2) : '0.00'} ₺
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+            <button
+              onClick={() => setShowTableTransferModal(false)}
+              className="mt-4 w-full py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold transition"
+            >
+              İptal
             </button>
           </div>
         </div>

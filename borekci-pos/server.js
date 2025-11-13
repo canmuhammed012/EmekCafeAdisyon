@@ -651,6 +651,134 @@ app.delete('/api/orders/:id', (req, res) => {
   });
 });
 
+// Masa değiştir - Siparişleri bir masadan diğerine taşı
+app.post('/api/orders/transfer', (req, res) => {
+  const { fromTableId, toTableId } = req.body;
+  
+  if (!fromTableId || !toTableId) {
+    res.status(400).json({error: 'Kaynak ve hedef masa ID\'si gerekli'});
+    return;
+  }
+  
+  if (fromTableId === toTableId) {
+    res.status(400).json({error: 'Aynı masaya taşınamaz'});
+    return;
+  }
+  
+  // Önce hedef masada mevcut siparişleri kontrol et
+  db.all(`SELECT productId, quantity FROM orders WHERE tableId = ?`, [toTableId], (err, existingOrders) => {
+    if (err) {
+      res.status(400).json({error: err.message});
+      return;
+    }
+    
+    // Kaynak masadaki siparişleri al
+    db.all(`SELECT productId, quantity FROM orders WHERE tableId = ?`, [fromTableId], (err, sourceOrders) => {
+      if (err) {
+        res.status(400).json({error: err.message});
+        return;
+      }
+      
+      if (sourceOrders.length === 0) {
+        res.status(400).json({error: 'Kaynak masada sipariş yok'});
+        return;
+      }
+      
+      // Her sipariş için hedef masada aynı ürün var mı kontrol et
+      const ordersToUpdate = [];
+      const ordersToInsert = [];
+      
+      sourceOrders.forEach(sourceOrder => {
+        const existing = existingOrders.find(e => e.productId === sourceOrder.productId);
+        if (existing) {
+          // Aynı ürün varsa, miktarı birleştir
+          ordersToUpdate.push({
+            productId: sourceOrder.productId,
+            newQuantity: existing.quantity + sourceOrder.quantity
+          });
+        } else {
+          // Yeni ürün, ekle
+          ordersToInsert.push(sourceOrder);
+        }
+      });
+      
+      // Transaction başlat
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        // Mevcut siparişleri güncelle
+        const updatePromises = ordersToUpdate.map(order => {
+          return new Promise((resolve, reject) => {
+            db.get(`SELECT price FROM products WHERE id = ?`, [order.productId], (err, product) => {
+              if (err || !product) {
+                reject(err || new Error('Ürün bulunamadı'));
+                return;
+              }
+              const total = product.price * order.newQuantity;
+              db.run(`UPDATE orders SET quantity = ?, total = ? WHERE tableId = ? AND productId = ?`,
+                [order.newQuantity, total, toTableId, order.productId], (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+          });
+        });
+        
+        // Yeni siparişleri ekle
+        const insertPromises = ordersToInsert.map(order => {
+          return new Promise((resolve, reject) => {
+            db.get(`SELECT price FROM products WHERE id = ?`, [order.productId], (err, product) => {
+              if (err || !product) {
+                reject(err || new Error('Ürün bulunamadı'));
+                return;
+              }
+              const total = product.price * order.quantity;
+              db.run(`INSERT INTO orders(tableId, productId, quantity, total) VALUES(?,?,?,?)`,
+                [toTableId, order.productId, order.quantity, total], (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+          });
+        });
+        
+        // Kaynak masadaki siparişleri sil
+        db.run(`DELETE FROM orders WHERE tableId = ?`, [fromTableId], (err) => {
+          if (err) {
+            db.run('ROLLBACK');
+            res.status(400).json({error: err.message});
+            return;
+          }
+          
+          // Tüm işlemleri bekle
+          Promise.all([...updatePromises, ...insertPromises])
+            .then(() => {
+              db.run('COMMIT', (err) => {
+                if (err) {
+                  res.status(400).json({error: err.message});
+                  return;
+                }
+                
+                // Masaları güncelle
+                updateTableTotal(fromTableId);
+                updateTableTotal(toTableId);
+                
+                // Broadcast
+                broadcast('ordersTransferred', {fromTableId, toTableId});
+                
+                res.json({success: true, message: 'Siparişler başarıyla taşındı'});
+              });
+            })
+            .catch((error) => {
+              db.run('ROLLBACK');
+              res.status(400).json({error: error.message});
+            });
+        });
+      });
+    });
+  });
+});
+
 // ========== ÖDEMELER ==========
 
 // Ödeme yap
