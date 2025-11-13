@@ -267,7 +267,7 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(130px, 13vw, 170px)', maxWidth: '170px' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col lg:max-h-[calc(100vh-120px)]" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 200px)', maxWidth: '200px' }}>
             <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(1rem, 1.5vw + 0.2rem, 1.5rem)' }}>Kategoriler</h2>
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
               {categories.map((category) => {
@@ -291,7 +291,7 @@ const TableDetail = ({ user }) => {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`relative overflow-hidden rounded-lg text-left font-bold transition shadow-xl ${
+                    className={`relative overflow-hidden rounded-lg text-center font-bold transition shadow-xl ${
                       isSelected
                         ? `${textColor} scale-105`
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -301,10 +301,13 @@ const TableDetail = ({ user }) => {
                       minHeight: 'clamp(40px, 5vh, 60px)',
                       width: '100%',
                       backgroundColor: isSelected ? category.color : undefined,
-                      fontSize: 'clamp(0.8rem, 1.1vw + 0.2rem, 1.1rem)',
-                      padding: 'clamp(0.5rem, 1.2vw, 1rem) clamp(0.75rem, 1.5vw, 1.5rem)',
+                      fontSize: 'clamp(0.7rem, 1vw, 1rem)',
+                      padding: 'clamp(0.5rem, 1vw, 0.875rem) clamp(0.5rem, 0.8vw, 1rem)',
                       lineHeight: '1.3',
-                      wordBreak: 'break-word'
+                      wordBreak: 'normal',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     {/* Degrade Işık Süzmesi */}
@@ -316,7 +319,7 @@ const TableDetail = ({ user }) => {
                     ></div>
                     
                     {/* İçerik */}
-                    <span className="relative z-10">{category.name}</span>
+                    <span className="relative z-10 block truncate">{category.name}</span>
                   </button>
                 );
               })}
@@ -524,69 +527,70 @@ const TableDetail = ({ user }) => {
                       className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50"
                       style={{ 
                         padding: 'clamp(0.5rem, 1vw, 0.75rem)',
-                        gap: 'clamp(0.25rem, 0.5vw, 0.5rem)'
+                        gap: 'clamp(0.375rem, 0.7vw, 0.75rem)'
                       }}
                     >
-                      {/* Ürün adı ve artı/eksi butonları */}
-                      <div className="flex items-center justify-between" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
-                        <h3 className="font-semibold text-gray-800 dark:text-white flex-1" style={{ 
-                          fontSize: 'clamp(0.75rem, 1vw, 0.875rem)',
-                          lineHeight: '1.3',
-                          wordBreak: 'break-word',
-                          overflowWrap: 'break-word',
-                          hyphens: 'auto'
+                      {/* Ürün adı - Üstte, tam genişlik */}
+                      <h3 className="font-semibold text-gray-800 dark:text-white text-center" style={{ 
+                        fontSize: 'clamp(0.75rem, 1vw, 0.875rem)',
+                        lineHeight: '1.3',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        hyphens: 'auto',
+                        width: '100%'
+                      }}>
+                        {order.name}
+                      </h3>
+                      
+                      {/* + 1 - Butonları - Ortada, yan yana */}
+                      <div className="flex items-center justify-center" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuantityChange(order.id, order.quantity + 1);
+                          }}
+                          className="bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold flex items-center justify-center"
+                          style={{
+                            width: 'clamp(2rem, 3vw, 2.75rem)',
+                            height: 'clamp(2rem, 3vw, 2.75rem)',
+                            fontSize: 'clamp(1rem, 1.4vw, 1.25rem)'
+                          }}
+                        >
+                          +
+                        </button>
+                        <span className="text-center font-bold text-gray-800 dark:text-white" style={{ 
+                          minWidth: 'clamp(2rem, 3vw, 2.75rem)',
+                          fontSize: 'clamp(0.9rem, 1.2vw, 1.1rem)'
                         }}>
-                          {order.name}
-                        </h3>
-                        <div className="flex items-center flex-shrink-0" style={{ gap: 'clamp(0.25rem, 0.4vw, 0.375rem)' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleQuantityChange(order.id, order.quantity - 1);
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold flex items-center justify-center"
-                            style={{
-                              width: 'clamp(1.75rem, 2.5vw, 2.5rem)',
-                              height: 'clamp(1.75rem, 2.5vw, 2.5rem)',
-                              fontSize: 'clamp(0.875rem, 1.2vw, 1.125rem)'
-                            }}
-                          >
-                            -
-                          </button>
-                          <span className="text-center font-bold text-gray-800 dark:text-white" style={{ 
-                            minWidth: 'clamp(1.5rem, 2vw, 2rem)',
-                            fontSize: 'clamp(0.75rem, 1vw, 0.95rem)'
-                          }}>
-                            {order.quantity}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleQuantityChange(order.id, order.quantity + 1);
-                            }}
-                            className="bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold flex items-center justify-center"
-                            style={{
-                              width: 'clamp(1.75rem, 2.5vw, 2.5rem)',
-                              height: 'clamp(1.75rem, 2.5vw, 2.5rem)',
-                              fontSize: 'clamp(0.875rem, 1.2vw, 1.125rem)'
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
+                          {order.quantity}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuantityChange(order.id, order.quantity - 1);
+                          }}
+                          className="bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold flex items-center justify-center"
+                          style={{
+                            width: 'clamp(2rem, 3vw, 2.75rem)',
+                            height: 'clamp(2rem, 3vw, 2.75rem)',
+                            fontSize: 'clamp(1rem, 1.4vw, 1.25rem)'
+                          }}
+                        >
+                          -
+                        </button>
                       </div>
                       
                       {/* Fiyat bilgisi */}
-                      <div className="flex items-center justify-between" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
-                        <p className="text-gray-600 dark:text-gray-400 flex-shrink-1" style={{ fontSize: 'clamp(0.7rem, 0.9vw, 0.8rem)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div className="flex items-center justify-between" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.5rem)', fontSize: 'clamp(0.65rem, 0.85vw, 0.75rem)' }}>
+                        <p className="text-gray-600 dark:text-gray-400 flex-shrink-1" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {order.price.toFixed(2)} ₺ x {order.quantity}
                         </p>
-                        <span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0" style={{ fontSize: 'clamp(0.8rem, 1vw, 0.95rem)', whiteSpace: 'nowrap' }}>
+                        <span className="font-bold text-blue-600 dark:text-blue-400 flex-shrink-0" style={{ whiteSpace: 'nowrap' }}>
                           {order.total.toFixed(2)} ₺
                         </span>
                       </div>
                       
-                      {/* Sil butonu (enine) */}
+                      {/* Sil butonu - Altta, tam genişlik */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -598,7 +602,7 @@ const TableDetail = ({ user }) => {
                           fontSize: 'clamp(0.7rem, 0.9vw, 0.8rem)'
                         }}
                       >
-                        Sil
+                        SİL
                       </button>
                     </div>
                   ))}
