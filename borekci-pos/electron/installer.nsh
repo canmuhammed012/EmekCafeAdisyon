@@ -1,8 +1,8 @@
 ; NSIS Installer Script - Startup ve Registry ayarları
 ; Electron Builder custom install/uninstall macros
 
-; Kurulum sonrası section (otomatik çalışır)
-Section -Post
+; Kurulum sonrası custom install macro
+!macro customInstall
   ; Icon dosyası yolu (extraResources ile kopyalanan logo.ico)
   ; Electron Builder extraResources dosyalarını $INSTDIR\resources klasörüne kopyalar
   Var /GLOBAL iconPath
@@ -30,7 +30,7 @@ Section -Post
   
   ; Registry'ye startup entry ekle (daha güvenilir)
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Emek Cafe Adisyon" "$INSTDIR\Emek Cafe Adisyon.exe"
-SectionEnd
+!macroend
 
 ; Kaldırma işlemi için custom uninstall macro
 !macro customUnInstall
