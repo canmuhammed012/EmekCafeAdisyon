@@ -413,7 +413,7 @@ const TableDetail = ({ user }) => {
                     <div
                       key={product.id}
                       onClick={() => handleAddProduct(product.id)}
-                      className="relative overflow-hidden bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex flex-col justify-center"
+                      className="relative bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer hover:shadow-2xl transition transform hover:scale-105 flex items-center justify-center"
                       style={{
                         aspectRatio: '1.5 / 1',
                         border: '2px solid',
@@ -424,7 +424,8 @@ const TableDetail = ({ user }) => {
                         minHeight: '100px',
                         minWidth: '120px',
                         maxWidth: '100%',
-                        padding: 'clamp(0.5rem, 1.5vw, 1rem)'
+                        padding: 'clamp(0.375rem, 1.2vw, 0.75rem)',
+                        overflow: 'hidden'
                       }}
                     >
                       {/* Degrade Işık Süzmesi - Daha Belirgin */}
@@ -435,32 +436,55 @@ const TableDetail = ({ user }) => {
                         }}
                       ></div>
                       
-                      {/* İçerik */}
-                      <div className="relative z-10 flex flex-col items-center justify-center text-center h-full w-full" style={{ transform: 'translateZ(0)', willChange: 'transform', gap: 'clamp(0.25rem, 0.75vw, 0.5rem)' }}>
-                        <h3 
-                          className="font-bold text-gray-800 dark:text-white leading-tight w-full overflow-hidden"
+                      {/* İçerik - Tam Kontrollü */}
+                      <div 
+                        className="relative z-10 flex flex-col items-center justify-center text-center"
+                        style={{ 
+                          width: '100%',
+                          height: '100%',
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          overflow: 'hidden',
+                          padding: '0',
+                          gap: 'clamp(0.125rem, 0.5vw, 0.375rem)'
+                        }}
+                      >
+                        {/* Ürün İsmi - Kesinlikle Taşmayacak */}
+                        <div 
+                          className="font-bold text-gray-800 dark:text-white"
                           style={{ 
-                            transform: 'translateZ(0)', 
-                            fontSize: 'clamp(0.75rem, 2vw + 0.25rem, 1.125rem)',
+                            width: '100%',
+                            maxWidth: '100%',
+                            fontSize: 'clamp(0.7rem, 1.8vw, 1rem)',
+                            lineHeight: '1.2',
+                            overflow: 'hidden',
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
                             wordBreak: 'break-word',
-                            lineHeight: '1.3'
+                            textOverflow: 'ellipsis',
+                            hyphens: 'auto'
                           }}
                         >
                           {product.name}
-                        </h3>
-                        <p 
-                          className="font-bold whitespace-nowrap overflow-hidden text-ellipsis w-full" 
+                        </div>
+                        
+                        {/* Fiyat - Kesinlikle Taşmayacak */}
+                        <div 
+                          className="font-bold" 
                           style={{ 
-                            color: productColor, 
-                            transform: 'translateZ(0)', 
-                            fontSize: 'clamp(0.875rem, 2.25vw + 0.25rem, 1.375rem)'
+                            width: '100%',
+                            maxWidth: '100%',
+                            color: productColor,
+                            fontSize: 'clamp(0.8rem, 2vw, 1.2rem)',
+                            lineHeight: '1.1',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           {product.price.toFixed(2)} ₺
-                        </p>
+                        </div>
                       </div>
                     </div>
                   );
