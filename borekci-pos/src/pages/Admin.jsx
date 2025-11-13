@@ -1301,10 +1301,10 @@ const Admin = ({ user }) => {
                                   }`}
                                 >
                                   <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
-                                    {new Date(payment.createdAt).toLocaleDateString('tr-TR')}
+                                    {formatDateTR(payment.createdAt)}
                                   </td>
                                   <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
-                                    {new Date(payment.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                    {formatTimeTR(payment.createdAt)}
                                   </td>
                                   <td className="py-3 px-4 text-gray-800 dark:text-gray-200 font-semibold">
                                     {payment.tableName}

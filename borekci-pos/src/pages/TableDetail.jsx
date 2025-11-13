@@ -24,6 +24,7 @@ const TableDetail = ({ user }) => {
   // Ödeme başarı modalı için state
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [paymentType, setPaymentType] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
 
   // Fonksiyonları normal function olarak tanımla (useCallback'siz)
   const loadOrders = async () => {
@@ -227,11 +228,15 @@ const TableDetail = ({ user }) => {
 
   const handlePayment = async (selectedPaymentType) => {
     try {
+      // Ödeme öncesi tutarı kaydet (broadcast'tan önce!)
+      const currentTotal = orders.reduce((sum, order) => sum + order.total, 0);
+      
       await createPayment({ tableId: parseInt(id), paymentType: selectedPaymentType });
       // Ödeme yapıldı - masalar ve ödemeler güncellenmeli
       broadcastUpdate(UPDATE_TYPES.ALL);
       // Ödeme başarı modalını göster
       setPaymentType(selectedPaymentType);
+      setPaymentAmount(currentTotal);
       setShowPaymentSuccess(true);
     } catch (error) {
       console.error('Ödeme yapılamadı:', error);
@@ -592,7 +597,7 @@ const TableDetail = ({ user }) => {
                 Ödeme {paymentType === 'Nakit' ? 'nakit' : 'kart'} ile alındı
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-4">
-                {total.toFixed(2)} ₺
+                {paymentAmount.toFixed(2)} ₺
               </p>
             </div>
             <button
