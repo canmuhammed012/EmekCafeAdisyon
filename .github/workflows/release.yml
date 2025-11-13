@@ -63,7 +63,7 @@ jobs:
           exit 1
         }
         
-        $exeFile = $allExeFiles[0].Name
+        $exeFileLocal = $allExeFiles[0].Name
         $exePath = $allExeFiles[0].FullName
         
         Write-Host "Found $($allExeFiles.Count) matching file(s):"
@@ -71,8 +71,13 @@ jobs:
           Write-Host "  - $($file.Name)"
         }
         
-        Write-Host "Found exe file: $exeFile"
+        Write-Host "Local exe file: $exeFileLocal"
         Write-Host "Full path: $exePath"
+        
+        # GitHub converts spaces to dots in file names when uploading
+        # Convert "Emek Cafe Adisyon Setup 1.0.42.exe" -> "Emek.Cafe.Adisyon.Setup.1.0.42.exe"
+        $exeFile = $exeFileLocal -replace ' ', '.'
+        Write-Host "GitHub file name (spaces -> dots): $exeFile"
         
         $fileSize = (Get-Item $exePath).Length
         $releaseDate = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
@@ -83,7 +88,7 @@ jobs:
         $sha512 = $sha512Hash.Hash.ToLower()
         Write-Host "SHA512: $sha512"
         
-        # latest.yml content - use the actual file name
+        # latest.yml content - use GitHub file name format (with dots, not spaces)
         $content = "version: $version`nfiles:`n  - url: $exeFile`n    sha512: $sha512`n    size: $fileSize`npath: $exeFile`nsha512: $sha512`nreleaseDate: $releaseDate"
         $content | Out-File -FilePath $latestYml -Encoding UTF8 -NoNewline
         Write-Host "latest.yml created successfully!"
