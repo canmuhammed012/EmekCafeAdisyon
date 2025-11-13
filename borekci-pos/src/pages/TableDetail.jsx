@@ -331,7 +331,7 @@ const TableDetail = ({ user }) => {
                     }`}
                     style={{
                       borderLeft: `clamp(3px, 0.3vw, 5px) solid ${category.color}`,
-                      minHeight: 'clamp(50px, 5.5vh, 70px)',
+                      minHeight: 'clamp(55px, 6vh, 80px)',
                       width: '100%',
                       backgroundColor: isSelected ? category.color : undefined,
                       fontSize: 'clamp(0.65rem, 0.85vw, 0.9rem)',
@@ -406,7 +406,7 @@ const TableDetail = ({ user }) => {
                          >
                            Tamamla
                          </button>
-                         <div className="text-right ml-auto sm:ml-0">
+                         <div className="text-right ml-auto">
                            <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
                              {total.toFixed(2)} ₺
                            </p>
