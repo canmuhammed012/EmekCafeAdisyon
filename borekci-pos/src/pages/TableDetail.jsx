@@ -286,7 +286,7 @@ const TableDetail = ({ user }) => {
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                      className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl transition shadow-xl whitespace-nowrap flex-shrink-0 ${
+                      className={`relative overflow-hidden px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3 md:py-4 lg:py-6 rounded-lg text-left font-bold transition shadow-xl whitespace-nowrap flex-shrink-0 ${
                       isSelected
                         ? `${textColor} scale-105`
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
@@ -296,6 +296,7 @@ const TableDetail = ({ user }) => {
                       minHeight: '40px',
                       minWidth: '120px',
                       backgroundColor: isSelected ? category.color : undefined,
+                      fontSize: 'clamp(0.75rem, 2vw, 1.25rem)'
                     }}
                   >
                     {/* Degrade Işık Süzmesi */}
@@ -435,10 +436,10 @@ const TableDetail = ({ user }) => {
                       
                       {/* İçerik */}
                       <div className="relative z-10 flex flex-col items-center justify-center text-center h-full px-1" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-1 sm:mb-2 text-xs sm:text-sm md:text-base lg:text-lg leading-tight break-words w-full" style={{ transform: 'translateZ(0)' }}>
+                        <h3 className="font-bold text-gray-800 dark:text-white mb-1 sm:mb-2 leading-tight break-words w-full overflow-hidden" style={{ transform: 'translateZ(0)', fontSize: 'clamp(0.65rem, 1.8vw, 1.1rem)' }}>
                           {product.name}
                         </h3>
-                        <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold whitespace-nowrap" style={{ color: productColor, transform: 'translateZ(0)' }}>
+                        <p className="font-bold overflow-hidden text-ellipsis" style={{ color: productColor, transform: 'translateZ(0)', fontSize: 'clamp(0.75rem, 2vw, 1.25rem)' }}>
                           {product.price.toFixed(2)} ₺
                         </p>
                       </div>

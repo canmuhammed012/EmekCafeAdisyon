@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -59,7 +59,6 @@
   "build": {
     "appId": "com.emekcafe.adisyon",
     "productName": "Emek Cafe Adisyon",
-    "icon": "public/logo.png",
     "directories": {
       "output": "release"
     },
