@@ -529,15 +529,17 @@ const TableDetail = ({ user }) => {
                            )}
                           <button
                             onClick={handleExit}
-                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                           >
-                            Çıkış
+                            <span className="text-sm sm:text-base">➜]</span>
+                            <span>Çıkış</span>
                           </button>
                           <button
                             onClick={() => navigate('/')}
-                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                           >
-                            Tamamla
+                            <span className="text-sm sm:text-base">✅</span>
+                            <span>Tamamla</span>
                           </button>
                          </div>
                          
