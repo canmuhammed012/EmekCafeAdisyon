@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, printReceipt } from '../services/api';
 import { getExchangeRates, convertWithDiscount } from '../services/currency';
@@ -32,6 +32,10 @@ const TableDetail = ({ user }) => {
   
   // Tıklanan ürün için glow efekti state
   const [clickedProductId, setClickedProductId] = useState(null);
+  
+  // Sayfa yüklendiğinde siparişlerin snapshot'ı (çıkış butonu için)
+  const [ordersSnapshot, setOrdersSnapshot] = useState(null);
+  const previousTableIdRef = useRef(null);
 
   // Fonksiyonları normal function olarak tanımla (useCallback'siz)
   const loadOrders = async () => {
@@ -75,6 +79,12 @@ const TableDetail = ({ user }) => {
   };
 
   useEffect(() => {
+    // Masa değiştiğinde snapshot'ı sıfırla
+    if (previousTableIdRef.current !== id) {
+      setOrdersSnapshot(null);
+      previousTableIdRef.current = id;
+    }
+    
     // Fonksiyonları useEffect içinde tanımla (infinite loop'u önlemek için)
     const loadOrdersLocal = async () => {
       try {
@@ -82,6 +92,19 @@ const TableDetail = ({ user }) => {
         setOrders(response.data);
         const total = response.data.reduce((sum, order) => sum + order.total, 0);
         setTable({ id: parseInt(id), total });
+        
+        // İlk yüklemede snapshot'ı kaydet (sadece snapshot yoksa)
+        setOrdersSnapshot(prevSnapshot => {
+          if (prevSnapshot === null) {
+            return response.data.map(order => ({
+              id: order.id,
+              productId: order.productId,
+              quantity: order.quantity,
+              total: order.total
+            }));
+          }
+          return prevSnapshot;
+        });
       } catch (error) {
         console.error('Siparişler yüklenemedi:', error);
       } finally {
@@ -312,6 +335,67 @@ const TableDetail = ({ user }) => {
     loadTables();
   };
 
+  // Çıkış butonu - son girişimdeki değişiklikleri geri al
+  const handleExit = async () => {
+    if (!ordersSnapshot) {
+      // Snapshot yoksa sadece çık
+      navigate('/');
+      return;
+    }
+
+    try {
+      // Güncel siparişleri API'den al
+      const response = await getOrders(id);
+      const currentOrders = response.data;
+      
+      // Snapshot ile mevcut siparişleri karşılaştır
+      const snapshotMap = new Map();
+      ordersSnapshot.forEach(order => {
+        snapshotMap.set(order.productId, order);
+      });
+      
+      const currentMap = new Map();
+      currentOrders.forEach(order => {
+        currentMap.set(order.productId, order);
+      });
+      
+      // Yeni eklenen siparişleri sil (snapshot'ta yok ama şu anda var)
+      for (const [productId, currentOrder] of currentMap) {
+        if (!snapshotMap.has(productId)) {
+          await deleteOrder(currentOrder.id);
+        }
+      }
+      
+      // Silinen siparişleri geri ekle ve miktarları güncelle
+      for (const [productId, snapshotOrder] of snapshotMap) {
+        if (!currentMap.has(productId)) {
+          // Snapshot'ta var ama şu anda yok - geri ekle
+          await createOrder({
+            tableId: parseInt(id),
+            productId: snapshotOrder.productId,
+            quantity: snapshotOrder.quantity,
+          });
+        } else {
+          // Her ikisinde de var - miktarı snapshot'a göre güncelle
+          const currentOrder = currentMap.get(productId);
+          if (currentOrder.quantity !== snapshotOrder.quantity) {
+            await updateOrder(currentOrder.id, { quantity: snapshotOrder.quantity });
+          }
+        }
+      }
+      
+      // Siparişleri yeniden yükle
+      await loadOrders();
+      broadcastUpdate(UPDATE_TYPES.ORDERS);
+      
+      // Ana sayfaya dön
+      navigate('/');
+    } catch (error) {
+      console.error('Çıkış işlemi sırasında hata:', error);
+      alert('Çıkış işlemi sırasında bir hata oluştu');
+    }
+  };
+
 
   const total = orders.reduce((sum, order) => sum + order.total, 0);
 
@@ -443,12 +527,18 @@ const TableDetail = ({ user }) => {
                                </button>
                              </>
                            )}
-                           <button
-                             onClick={() => navigate('/')}
-                             className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
-                           >
-                             Tamamla
-                           </button>
+                          <button
+                            onClick={() => navigate('/')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                          >
+                            Tamamla
+                          </button>
+                          <button
+                            onClick={handleExit}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                          >
+                            Çıkış
+                          </button>
                          </div>
                          
                          {/* Fiyat ve Kur bilgileri */}
