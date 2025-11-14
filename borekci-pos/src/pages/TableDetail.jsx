@@ -501,6 +501,22 @@ const TableDetail = ({ user }) => {
                            {orders.length > 0 && (
                              <>
                                <button
+                                 onClick={() => handlePayment('Nakit')}
+                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               >
+                                 <span className="text-sm sm:text-base">💵</span>
+                                 <span className="hidden sm:inline">Nakit ile Kapat</span>
+                                 <span className="sm:hidden">Nakit</span>
+                               </button>
+                               <button
+                                 onClick={() => handlePayment('Kart')}
+                                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
+                               >
+                                 <span className="text-sm sm:text-base">💳</span>
+                                 <span className="hidden sm:inline">Kart ile Kapat</span>
+                                 <span className="sm:hidden">Kart</span>
+                               </button>
+                               <button
                                  onClick={handlePrintReceipt}
                                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                                  title="Fiş Yazdır"
@@ -509,35 +525,19 @@ const TableDetail = ({ user }) => {
                                  <span className="hidden sm:inline">Fiş Yazdır</span>
                                  <span className="sm:hidden">Fiş</span>
                                </button>
-                               <button
-                                 onClick={() => handlePayment('Nakit')}
-                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
-                               >
-                                 <span className="text-sm sm:text-base">💵</span>
-                                 <span className="hidden sm:inline">Nakit ile Kapat</span>
-                                 <span className="sm:hidden">Nakit</span>
-                               </button>
-                               <button
-                                 onClick={() => handlePayment('Kart')}
-                                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-1 text-xs sm:text-sm"
-                               >
-                                 <span className="text-sm sm:text-base">💳</span>
-                                 <span className="hidden sm:inline">Kart ile Kapat</span>
-                                 <span className="sm:hidden">Kart</span>
-                               </button>
                              </>
                            )}
-                          <button
-                            onClick={() => navigate('/')}
-                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
-                          >
-                            Tamamla
-                          </button>
                           <button
                             onClick={handleExit}
                             className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
                           >
                             Çıkış
+                          </button>
+                          <button
+                            onClick={() => navigate('/')}
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm"
+                          >
+                            Tamamla
                           </button>
                          </div>
                          
