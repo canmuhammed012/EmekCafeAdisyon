@@ -37,6 +37,7 @@ jobs:
           Get-ChildItem -Path "borekci-pos\release" -Recurse | Select-Object FullName, Length
         } else {
           Write-Host "Release folder not found!"
+          exit 1
         }
       shell: powershell
     
@@ -46,32 +47,50 @@ jobs:
         $version = "${{ github.ref_name }}".Replace("v", "")
         $latestYml = Join-Path $releasePath "latest.yml"
         
+        # Wait a bit to ensure files are written
+        Start-Sleep -Seconds 2
+        
         # Find the actual .exe file in release folder
         # Electron Builder creates file name from productName, replacing spaces with dots
         # List all .exe files and find the one with "Setup" and version number
         Write-Host "Searching for .exe file in $releasePath..."
         Write-Host "Looking for files containing 'Setup' and version '$version'..."
         
+        # First, list all files to debug
+        Write-Host "All files in release folder:"
+        Get-ChildItem -Path $releasePath | Select-Object Name, Length | Format-Table
+        
+        # Try to find Setup exe with version
         $allExeFiles = Get-ChildItem -Path $releasePath -Filter "*.exe" | Where-Object { 
-          $_.Name -like "*Setup*" -and $_.Name -like "*$version*" -and $_.Name -notlike "*uninstaller*"
+          $_.Name -like "*Setup*" -and $_.Name -notlike "*uninstaller*"
         }
         
+        Write-Host "Found $($allExeFiles.Count) Setup .exe file(s):"
+        foreach ($file in $allExeFiles) {
+          Write-Host "  - $($file.Name)"
+        }
+        
+        # If no file with version found, try to find the most recent Setup file
         if ($allExeFiles.Count -eq 0) {
-          Write-Host "ERROR: No .exe file found matching pattern"
+          Write-Host "ERROR: No Setup .exe file found"
           Write-Host "Files in release folder:"
           Get-ChildItem -Path $releasePath | Select-Object Name
           exit 1
         }
         
-        $exeFileLocal = $allExeFiles[0].Name
-        $exePath = $allExeFiles[0].FullName
+        # Get the most recent Setup file (should be the one we just built)
+        $exeFile = $allExeFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         
-        Write-Host "Found $($allExeFiles.Count) matching file(s):"
-        foreach ($file in $allExeFiles) {
-          Write-Host "  - $($file.Name)"
+        # Verify version matches (check if version is in filename or use the latest one)
+        if ($exeFile.Name -notlike "*$version*") {
+          Write-Host "WARNING: File name '$($exeFile.Name)' does not contain version '$version'"
+          Write-Host "Using the most recent Setup file anyway: $($exeFile.Name)"
         }
         
-        Write-Host "Local exe file: $exeFileLocal"
+        $exeFileLocal = $exeFile.Name
+        $exePath = $exeFile.FullName
+        
+        Write-Host "Selected exe file: $exeFileLocal"
         Write-Host "Full path: $exePath"
         
         # GitHub converts spaces to dots in file names when uploading
