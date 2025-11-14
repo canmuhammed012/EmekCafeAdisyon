@@ -432,6 +432,8 @@ const TableDetail = ({ user }) => {
                 // Beyaz renk için özel kontrol
                 const isWhite = category.color.toUpperCase() === '#FFFFFF' || category.color.toUpperCase() === 'FFFFFF';
                 const textColor = isSelected && isWhite ? 'text-gray-800 dark:text-gray-800' : isSelected ? 'text-white' : 'text-gray-800 dark:text-white';
+                // Beyaz kategori için border rengini gri yap
+                const borderColor = isWhite ? (isSelected ? '#9CA3AF' : '#D1D5DB') : category.color;
                 
                 return (
                   <button
@@ -443,7 +445,7 @@ const TableDetail = ({ user }) => {
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                     style={{
-                      borderLeft: `clamp(3px, 0.3vw, 5px) solid ${category.color}`,
+                      borderLeft: `clamp(3px, 0.3vw, 5px) solid ${borderColor}`,
                       minHeight: 'clamp(55px, 6vh, 80px)',
                       width: '100%',
                       backgroundColor: isSelected ? category.color : undefined,
@@ -608,6 +610,11 @@ const TableDetail = ({ user }) => {
                   const hasCustomColor = product.color && product.color !== '#FFFFFF';
                   const isClicked = clickedProductId === product.id;
                   
+                  // Beyaz kategori/ürün için border rengini gri yap
+                  const isWhiteCategory = categoryColor.toUpperCase() === '#FFFFFF' || categoryColor.toUpperCase() === 'FFFFFF';
+                  const isWhiteProduct = productColor.toUpperCase() === '#FFFFFF' || productColor.toUpperCase() === 'FFFFFF';
+                  const borderColor = (isWhiteCategory || isWhiteProduct) ? '#9CA3AF' : productColor;
+                  
                   return (
                     <div
                       key={product.id}
@@ -616,7 +623,7 @@ const TableDetail = ({ user }) => {
                       style={{
                         aspectRatio: '1.2 / 1',
                         border: `clamp(${isClicked ? '2px' : '0.5px'}, ${isClicked ? '0.3vw' : '0.1vw'}, ${isClicked ? '3px' : '1px'}) solid`,
-                        borderColor: productColor,
+                        borderColor: borderColor,
                         boxShadow: isClicked
                           ? `0 0 20px rgba(59, 130, 246, 0.8), 0 0 40px rgba(147, 51, 234, 0.6), 0 0 60px rgba(236, 72, 153, 0.4), 0 1px 5px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
                           : hasCustomColor 
@@ -672,11 +679,10 @@ const TableDetail = ({ user }) => {
                         
                         {/* Fiyat - Kesinlikle Taşmayacak */}
                         <div 
-                          className="font-bold" 
+                          className="font-bold text-gray-800 dark:text-white" 
                           style={{ 
                             width: '100%',
                             maxWidth: '100%',
-                            color: productColor,
                             fontSize: 'clamp(0.65rem, 0.8vw, 0.85rem)',
                             lineHeight: '1.2',
                             overflow: 'hidden',
