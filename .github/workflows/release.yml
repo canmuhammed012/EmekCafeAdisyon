@@ -69,19 +69,58 @@ jobs:
           }
         }
     
-    - name: Build application (electron mirror, retry once)
+    - name: Pre-download Electron (bypass GitHub CDN issues)
+      shell: pwsh
+      working-directory: ./borekci-pos
+      run: |
+        $electronVersion = "39.1.2"
+        $electronZip = "electron-v$electronVersion-win32-x64.zip"
+        
+        # Try multiple mirrors
+        $mirrors = @(
+          "https://npmmirror.com/mirrors/electron/v$electronVersion/$electronZip",
+          "https://cdn.npmmirror.com/binaries/electron/v$electronVersion/$electronZip",
+          "https://github.com/electron/electron/releases/download/v$electronVersion/$electronZip"
+        )
+        
+        # electron-builder cache location
+        $builderCache = "$env:LOCALAPPDATA\electron-builder\Cache\electron"
+        $targetDir = "$builderCache\$electronZip"
+        
+        Write-Host "Pre-downloading Electron $electronVersion..."
+        Write-Host "Target: $targetDir"
+        
+        # Create cache directory
+        New-Item -ItemType Directory -Force -Path $builderCache | Out-Null
+        
+        # Try each mirror until one works
+        $downloaded = $false
+        foreach ($url in $mirrors) {
+          Write-Host "Trying: $url"
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $targetDir -UseBasicParsing -TimeoutSec 60
+            Write-Host "✓ Electron downloaded successfully from mirror"
+            $downloaded = $true
+            break
+          } catch {
+            Write-Host "⚠ Failed: $($_.Exception.Message)"
+            continue
+          }
+        }
+        
+        if (-not $downloaded) {
+          Write-Host "⚠ All mirrors failed, electron-builder will try default"
+        }
+    
+    - name: Build application (with retry)
       env:
         ELECTRON_BUILDER_CACHE: ${{ env.ELECTRON_BUILDER_CACHE }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-        ELECTRON_CUSTOM_DIR: electron/
-        npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
-        npm_config_electron_custom_dir: electron/
       shell: pwsh
       working-directory: ./borekci-pos
       run: |
-        Write-Host "electron-builder attempt 1 (with mirror)..."
+        Write-Host "electron-builder attempt 1..."
         npm run build:electron
         if ($LASTEXITCODE -ne 0) {
           Write-Host "electron-builder attempt 1 failed. Retrying after short wait..."
