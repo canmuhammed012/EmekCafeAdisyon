@@ -43,11 +43,10 @@ jobs:
     - name: Build application
       env:
         ELECTRON_BUILDER_CACHE: ${{ env.ELECTRON_BUILDER_CACHE }}
-      run: npm run build:electron
-      working-directory: ./borekci-pos
-      env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: npm run build:electron
+      working-directory: ./borekci-pos
     
     - name: List release files
       run: |
