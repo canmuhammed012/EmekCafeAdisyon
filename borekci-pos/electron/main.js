@@ -376,6 +376,22 @@ app.whenReady().then(() => {
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.emekcafe.adisyon');
     console.log('✅ App User Model ID ayarlandı: com.emekcafe.adisyon');
+    
+    // Görev çubuğu icon'u için icon path'ini kontrol et ve ayarla
+    let iconPath;
+    if (app.isPackaged) {
+      const resourcesPath = path.join(process.resourcesPath, 'logo.ico');
+      if (fs.existsSync(resourcesPath)) {
+        iconPath = resourcesPath;
+        // Ana pencere oluşturulduktan sonra icon'u set et
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setIcon(iconPath);
+            console.log('✅ Görev çubuğu icon ayarlandı:', iconPath);
+          }
+        }, 100);
+      }
+    }
   }
   
   createWindow();

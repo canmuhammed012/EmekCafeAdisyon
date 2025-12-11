@@ -103,7 +103,7 @@
           ]
         }
       ],
-      "icon": "public/logo.png",
+      "icon": "public/logo.ico",
       "signAndEditExecutable": false,
       "forceCodeSigning": false
     },
