@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCategories, getProducts, createOrder } from '../services/api';
 import Footer from '../components/Footer';
+import AlertModal from '../components/AlertModal';
 
 const Menu = ({ user }) => {
   const { tableId } = useParams();
@@ -10,6 +11,14 @@ const Menu = ({ user }) => {
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Alert modal için state
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
 
   useEffect(() => {
     // Fonksiyonları useEffect içinde tanımla (infinite loop'u önlemek için)
@@ -64,7 +73,12 @@ const Menu = ({ user }) => {
       // Socket event'i TableDetail'de zaten dinleniyor, otomatik güncellenecek
     } catch (error) {
       console.error('Ürün eklenemedi:', error);
-      alert('Ürün eklenirken bir hata oluştu: ' + (error.response?.data?.error || error.message));
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Ürün eklenirken bir hata oluştu: ' + (error.response?.data?.error || error.message),
+        type: 'error'
+      });
     }
   };
 
@@ -139,6 +153,15 @@ const Menu = ({ user }) => {
         </div>
         </div>
       </div>
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+      
       <Footer />
     </div>
   );

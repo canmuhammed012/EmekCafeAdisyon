@@ -6,6 +6,7 @@ import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import { formatTimeTR } from '../utils/dateFormatter';
 import { playActionSound } from '../utils/sound';
 import Footer from '../components/Footer';
+import AlertModal from '../components/AlertModal';
 
 const TableDetail = ({ user }) => {
   const { id } = useParams();
@@ -34,6 +35,14 @@ const TableDetail = ({ user }) => {
   
   // Hesap isteği başarı modalı için state
   const [showPaymentRequestSuccess, setShowPaymentRequestSuccess] = useState(false);
+  
+  // Alert modal için state
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
   
   // Tıklanan ürün için glow efekti state
   const [clickedProductId, setClickedProductId] = useState(null);
@@ -273,7 +282,12 @@ const TableDetail = ({ user }) => {
       broadcastUpdate(UPDATE_TYPES.ORDERS);
     } catch (error) {
       console.error('Ürün eklenemedi:', error);
-      alert('Ürün eklenirken bir hata oluştu: ' + (error.response?.data?.error || error.message));
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Ürün eklenirken bir hata oluştu: ' + (error.response?.data?.error || error.message),
+        type: 'error'
+      });
     }
   };
 
@@ -291,7 +305,12 @@ const TableDetail = ({ user }) => {
       setShowPaymentSuccess(true);
     } catch (error) {
       console.error('Ödeme yapılamadı:', error);
-      alert('Ödeme yapılırken bir hata oluştu');
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Ödeme yapılırken bir hata oluştu',
+        type: 'error'
+      });
     }
   };
 
@@ -305,12 +324,22 @@ const TableDetail = ({ user }) => {
     try {
       const response = await printReceipt(parseInt(id), 0);
       if (response.data.success) {
-        alert('✅ ' + response.data.message);
+        setAlertModal({
+          isOpen: true,
+          title: 'Başarılı',
+          message: response.data.message,
+          type: 'success'
+        });
       }
     } catch (error) {
       console.error('Fiş yazdırma hatası:', error);
       const errorMessage = error.response?.data?.error || error.message || 'Fiş yazdırılamadı';
-      alert('❌ ' + errorMessage);
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: errorMessage,
+        type: 'error'
+      });
     }
   };
 
@@ -323,7 +352,12 @@ const TableDetail = ({ user }) => {
       navigate(`/table/${toTableId}`);
     } catch (error) {
       console.error('Masa değiştirme hatası:', error);
-      alert(error.response?.data?.error || 'Masa değiştirme başarısız oldu');
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: error.response?.data?.error || 'Masa değiştirme başarısız oldu',
+        type: 'error'
+      });
     }
   };
 
@@ -400,7 +434,12 @@ const TableDetail = ({ user }) => {
       navigate('/');
     } catch (error) {
       console.error('Çıkış işlemi sırasında hata:', error);
-      alert('Çıkış işlemi sırasında bir hata oluştu');
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Çıkış işlemi sırasında bir hata oluştu',
+        type: 'error'
+      });
     }
   };
 
@@ -737,7 +776,12 @@ const TableDetail = ({ user }) => {
                         setShowPaymentRequestSuccess(true);
                       } catch (error) {
                         console.error('Hesap isteği gönderilemedi:', error);
-                        alert('❌ Hesap isteği gönderilemedi: ' + (error.response?.data?.error || error.message));
+                        setAlertModal({
+                          isOpen: true,
+                          title: 'Hata',
+                          message: 'Hesap isteği gönderilemedi: ' + (error.response?.data?.error || error.message),
+                          type: 'error'
+                        });
                       }
                     }}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-2"
@@ -963,6 +1007,15 @@ const TableDetail = ({ user }) => {
           </div>
         </div>
       )}
+      
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
       
       <Footer className="flex-shrink-0 mt-auto" />
     </div>

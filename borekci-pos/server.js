@@ -1114,10 +1114,11 @@ app.get('/api/printers/windows', (req, res) => {
 });
 
 // Windows yazıcıya fiş yazdır (node-printer kullanarak)
+// USB yazıcı desteği eklendi - önce USB denenir, başarısız olursa Windows yazıcıya fallback yapılır
 app.post('/api/print/receipt', (req, res) => {
   console.log('📝 /api/print/receipt endpoint çağrıldı');
   console.log('📦 Request body:', req.body);
-  const { tableId, printerName, printerIndex } = req.body;
+  const { tableId, printerName, printerIndex, printerType = 'auto' } = req.body;
   
   if (!tableId) {
     res.status(400).json({ error: 'Masa ID gerekli' });
@@ -1149,7 +1150,161 @@ app.post('/api/print/receipt', (req, res) => {
       db.get(`SELECT value as restaurantName FROM settings WHERE key = 'restaurantName'`, (err, setting) => {
         const restaurantName = setting?.value || 'Emek Cafe Adisyon';
         
-        try {
+        // Fiş içeriğini ESC/POS formatında oluştur (hem USB hem Windows için aynı)
+        let receiptContent = '\x1B\x40'; // Initialize printer
+        receiptContent += '\x1B\x61\x01'; // Center align
+        receiptContent += '\x1B\x21\x30'; // Double height and width
+        receiptContent += `${restaurantName}\n`;
+        receiptContent += '\x1B\x21\x00'; // Normal text
+        receiptContent += '\x1B\x61\x00'; // Left align
+        receiptContent += '--------------------------------\n';
+        receiptContent += `Masa: ${table.name}\n`;
+        receiptContent += `Tarih: ${new Date().toLocaleString('tr-TR')}\n`;
+        receiptContent += '--------------------------------\n';
+        
+        // Siparişleri yazdır
+        orders.forEach((order) => {
+          const line = `${order.name} x${order.quantity}`;
+          const price = `${order.total.toFixed(2)} ₺`;
+          const spaces = 32 - line.length - price.length;
+          receiptContent += `${line}${' '.repeat(Math.max(0, spaces))}${price}\n`;
+        });
+        
+        receiptContent += '--------------------------------\n';
+        receiptContent += '\x1B\x61\x02'; // Right align
+        receiptContent += `TOPLAM: ${table.total.toFixed(2)} ₺\n`;
+        receiptContent += '\x1B\x61\x00'; // Left align
+        receiptContent += '\n\n';
+        receiptContent += '--------------------------------\n';
+        receiptContent += '\x1B\x61\x01'; // Center align
+        receiptContent += 'Nişanca Mahallesi Türkeli Caddesi,\n';
+        receiptContent += 'Kumkapı 70/B, 34130 Fatih/İstanbul\n';
+        receiptContent += '\n';
+        receiptContent += '(0212) 516 54 86\n';
+        receiptContent += '\n';
+        receiptContent += 'Bizi tercih ettiğiniz için\n';
+        receiptContent += 'teşekkür ederiz!\n';
+        receiptContent += '\n\n\n';
+        receiptContent += '\x1D\x56\x00'; // Cut paper
+        
+        // USB yazıcıyı dene (printerType === 'usb' veya 'auto' ise)
+        if (printerType === 'usb' || printerType === 'auto') {
+          console.log('🔌 USB yazıcı deneniyor...');
+          try {
+            // USB yazıcıları bul
+            let usbDevices = [];
+            if (typeof escposUSB.find === 'function') {
+              usbDevices = escposUSB.find();
+            } else if (escposUSB.device && typeof escposUSB.device.find === 'function') {
+              usbDevices = escposUSB.device.find();
+            } else {
+              // usb paketi ile manuel arama
+              const allDevices = usb.getDeviceList();
+              // ESC/POS yazıcıları için yaygın vendor ID'leri filtrele
+              const commonVendorIds = [0x04f9, 0x0483, 0x1504, 0x154f, 0x04e8];
+              usbDevices = allDevices.filter(device => {
+                const descriptor = device.deviceDescriptor;
+                return commonVendorIds.includes(descriptor.idVendor);
+              });
+            }
+            
+            if (usbDevices && usbDevices.length > 0) {
+              // Yazıcı seçimi
+              let selectedUSBDevice = null;
+              if (typeof printerIndex === 'number' && printerIndex >= 0 && printerIndex < usbDevices.length) {
+                selectedUSBDevice = usbDevices[printerIndex];
+              } else {
+                selectedUSBDevice = usbDevices[0]; // İlk USB yazıcıyı kullan
+              }
+              
+              if (selectedUSBDevice) {
+                console.log('🖨️ USB yazıcı seçildi, doğrudan yazdırılıyor...');
+                
+                // escpos-usb ile doğrudan yazdır
+                try {
+                  // escpos-usb API'sini kullan
+                  let device;
+                  if (typeof escposUSB.USB === 'function') {
+                    device = escposUSB.USB(selectedUSBDevice);
+                  } else if (escposUSB.device && typeof escposUSB.device.USB === 'function') {
+                    device = escposUSB.device.USB(selectedUSBDevice);
+                  } else {
+                    // Direkt USB cihazını kullan
+                    device = selectedUSBDevice;
+                  }
+                  
+                  const options = { encoding: "GB18030" /* default */ };
+                  const printer = new escpos.Printer(device, options);
+                  
+                  device.open((error) => {
+                    if (error) {
+                      console.error('❌ USB yazıcı açılamadı:', error);
+                      // USB başarısız, Windows yazıcıya fallback yap
+                      printToWindowsPrinter();
+                    } else {
+                      console.log('✅ USB yazıcı açıldı, yazdırılıyor...');
+                      
+                      // ESC/POS komutlarını doğrudan gönder (Buffer olarak)
+                      const buffer = Buffer.from(receiptContent, 'utf8');
+                      
+                      // escpos-usb device.write() kullan
+                      if (typeof device.write === 'function') {
+                        device.write(buffer, (writeError) => {
+                          if (writeError) {
+                            console.error('❌ USB yazıcıya yazma hatası:', writeError);
+                            try { device.close(); } catch(e) {}
+                            // USB başarısız, Windows yazıcıya fallback yap
+                            printToWindowsPrinter();
+                          } else {
+                            console.log('✅ USB yazıcıya başarıyla yazıldı');
+                            try { device.close(); } catch(e) {}
+                            res.json({ success: true, message: 'Fiş USB yazıcıya başarıyla yazdırıldı', printerType: 'usb' });
+                          }
+                        });
+                      } else {
+                        // Alternatif: escpos Printer API kullan
+                        try {
+                          printer.text(receiptContent);
+                          printer.cut();
+                          printer.close();
+                          console.log('✅ USB yazıcıya başarıyla yazıldı (Printer API)');
+                          res.json({ success: true, message: 'Fiş USB yazıcıya başarıyla yazdırıldı', printerType: 'usb' });
+                        } catch (printerError) {
+                          console.error('❌ Printer API hatası:', printerError);
+                          try { device.close(); } catch(e) {}
+                          printToWindowsPrinter();
+                        }
+                      }
+                    }
+                  });
+                  
+                  return; // USB yazdırma başlatıldı, fonksiyondan çık
+                } catch (usbError) {
+                  console.error('❌ USB yazıcı hatası:', usbError);
+                  // USB başarısız, Windows yazıcıya fallback yap
+                  printToWindowsPrinter();
+                }
+              } else {
+                console.warn('⚠️ USB yazıcı seçilemedi, Windows yazıcıya geçiliyor...');
+                printToWindowsPrinter();
+              }
+            } else {
+              console.warn('⚠️ USB yazıcı bulunamadı, Windows yazıcıya geçiliyor...');
+              printToWindowsPrinter();
+            }
+          } catch (usbFindError) {
+            console.error('❌ USB yazıcı arama hatası:', usbFindError);
+            // USB başarısız, Windows yazıcıya fallback yap
+            printToWindowsPrinter();
+          }
+        } else {
+          // Direkt Windows yazıcıya git
+          printToWindowsPrinter();
+        }
+        
+        // Windows yazıcıya yazdırma fonksiyonu
+        function printToWindowsPrinter() {
+          try {
           // Windows yazıcılarını bul
           console.log('🔍 Windows yazıcıları aranıyor...');
           console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
@@ -1303,44 +1458,7 @@ app.post('/api/print/receipt', (req, res) => {
           
           console.log('🖨️ Seçilen yazıcı:', selectedPrinter.name);
           
-          // Fiş içeriğini ESC/POS formatında oluştur
-          let receiptContent = '\x1B\x40'; // Initialize printer
-          receiptContent += '\x1B\x61\x01'; // Center align
-          receiptContent += '\x1B\x21\x30'; // Double height and width
-          receiptContent += `${restaurantName}\n`;
-          receiptContent += '\x1B\x21\x00'; // Normal text
-          receiptContent += '\x1B\x61\x00'; // Left align
-          receiptContent += '--------------------------------\n';
-          receiptContent += `Masa: ${table.name}\n`;
-          receiptContent += `Tarih: ${new Date().toLocaleString('tr-TR')}\n`;
-          receiptContent += '--------------------------------\n';
-          
-          // Siparişleri yazdır
-          orders.forEach((order) => {
-            const line = `${order.name} x${order.quantity}`;
-            const price = `${order.total.toFixed(2)} ₺`;
-            const spaces = 32 - line.length - price.length;
-            receiptContent += `${line}${' '.repeat(Math.max(0, spaces))}${price}\n`;
-          });
-          
-          receiptContent += '--------------------------------\n';
-          receiptContent += '\x1B\x61\x02'; // Right align
-          receiptContent += `TOPLAM: ${table.total.toFixed(2)} ₺\n`;
-          receiptContent += '\x1B\x61\x00'; // Left align
-          receiptContent += '\n\n';
-          receiptContent += '--------------------------------\n';
-          receiptContent += '\x1B\x61\x01'; // Center align
-          receiptContent += 'Nişanca Mahallesi Türkeli Caddesi,\n';
-          receiptContent += 'Kumkapı 70/B, 34130 Fatih/İstanbul\n';
-          receiptContent += '\n';
-          receiptContent += '(0212) 516 54 86\n';
-          receiptContent += '\n';
-          receiptContent += 'Bizi tercih ettiğiniz için\n';
-          receiptContent += 'teşekkür ederiz!\n';
-          receiptContent += '\n\n\n';
-          receiptContent += '\x1D\x56\x00'; // Cut paper
-          
-          // Windows yazıcıya yazdır
+          // Windows yazıcıya yazdır (receiptContent zaten yukarıda oluşturuldu)
           console.log('✅ Yazıcıya yazdırılıyor:', selectedPrinter.name);
           
           // Önce yazıcının gerçekten var olup olmadığını kontrol et (esnek kontrol)

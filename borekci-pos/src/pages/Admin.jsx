@@ -22,6 +22,7 @@ import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import { formatDateTR, formatTimeTR } from '../utils/dateFormatter';
 import { getSocket } from '../services/socket';
 import Footer from '../components/Footer';
+import AlertModal from '../components/AlertModal';
 
 // Hex rengi RGB'ye çevir (yardımcı fonksiyon)
 const hexToRgb = (hex) => {
@@ -59,6 +60,14 @@ const Admin = ({ user }) => {
   const [draggedElement, setDraggedElement] = useState(null);
   const [sortedCategories, setSortedCategories] = useState([]);
   const [sortedProducts, setSortedProducts] = useState({}); // { categoryId: [productIds] }
+  
+  // Alert modal için state
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
   
   // Kategori açık/kapalı durumu
   const [expandedCategories, setExpandedCategories] = useState([]);
@@ -474,7 +483,12 @@ const Admin = ({ user }) => {
   const handleProductSubmit = async () => {
     // Form validasyonu
     if (!productForm.name || !productForm.price || !productForm.categoryId) {
-      alert('Lütfen tüm alanları doldurun!');
+      setAlertModal({
+        isOpen: true,
+        title: 'Uyarı',
+        message: 'Lütfen tüm alanları doldurun!',
+        type: 'warning'
+      });
       return;
     }
     
@@ -491,7 +505,12 @@ const Admin = ({ user }) => {
       broadcastUpdate(UPDATE_TYPES.PRODUCTS);
     } catch (error) {
       console.error('Ürün kaydedilemedi:', error);
-      alert('Ürün kaydedilirken hata oluştu!');
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Ürün kaydedilirken hata oluştu!',
+        type: 'error'
+      });
     }
   };
 
@@ -701,11 +720,21 @@ const Admin = ({ user }) => {
         broadcastUpdate(UPDATE_TYPES.ALL); // Tüm sayfaları güncelle
       }
       setShowSortModal(false);
-      alert('Sıralama başarıyla kaydedildi!');
+      setAlertModal({
+        isOpen: true,
+        title: 'Başarılı',
+        message: 'Sıralama başarıyla kaydedildi!',
+        type: 'success'
+      });
     } catch (error) {
       console.error('❌ Sıralama kaydedilemedi:', error);
       console.error('Error details:', error.response?.data || error.message);
-      alert('Sıralama kaydedilirken hata oluştu: ' + (error.response?.data?.error || error.message));
+      setAlertModal({
+        isOpen: true,
+        title: 'Hata',
+        message: 'Sıralama kaydedilirken hata oluştu: ' + (error.response?.data?.error || error.message),
+        type: 'error'
+      });
     }
   };
 
@@ -1541,6 +1570,15 @@ const Admin = ({ user }) => {
           </div>
         </div>
       )}
+      
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal({ ...alertModal, isOpen: false })}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
       
       <Footer />
     </div>
