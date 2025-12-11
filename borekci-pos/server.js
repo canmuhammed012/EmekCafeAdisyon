@@ -154,29 +154,47 @@ db.serialize(() => {
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(tableId) REFERENCES tables(id),
     FOREIGN KEY(productId) REFERENCES products(id)
-  )`);
-
-  // Mevcut sipariş tablosuna updatedAt kolonu ekle (eğer yoksa) ve değerleri doldur
-  db.all(`PRAGMA table_info(orders)`, (infoErr, rows) => {
-    if (infoErr) {
-      console.error('❌ orders tablosu şema okunamadı:', infoErr.message);
+  )`, (createErr) => {
+    if (createErr) {
+      console.error('❌ orders tablosu oluşturulamadı:', createErr.message);
       return;
     }
-    const hasUpdatedAt = rows.some(r => r.name === 'updatedAt');
-    if (!hasUpdatedAt) {
-      db.run(`ALTER TABLE orders ADD COLUMN updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
-        if (err && !/duplicate column/i.test(err.message)) {
-          console.error('❌ orders.updatedAt kolonu eklenemedi:', err.message);
-        } else {
-          console.log('✓ orders.updatedAt kolonu eklendi');
-          db.run(`UPDATE orders SET updatedAt = createdAt WHERE updatedAt IS NULL`, (updateErr) => {
-            if (updateErr) {
-              console.error('❌ orders.updatedAt doldurulamadı:', updateErr.message);
-            }
-          });
-        }
-      });
-    }
+    
+    // Mevcut sipariş tablosuna updatedAt kolonu ekle (eğer yoksa) ve değerleri doldur
+    // Bu işlem CREATE TABLE'dan hemen sonra, callback içinde çalışıyor
+    db.all(`PRAGMA table_info(orders)`, (infoErr, rows) => {
+      if (infoErr) {
+        console.error('❌ orders tablosu şema okunamadı:', infoErr.message);
+        return;
+      }
+      const hasUpdatedAt = rows.some(r => r.name === 'updatedAt');
+      if (!hasUpdatedAt) {
+        console.log('⚠️ orders.updatedAt kolonu eksik, ekleniyor...');
+        db.run(`ALTER TABLE orders ADD COLUMN updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP`, (alterErr) => {
+          if (alterErr && !/duplicate column/i.test(alterErr.message)) {
+            console.error('❌ orders.updatedAt kolonu eklenemedi:', alterErr.message);
+          } else {
+            console.log('✓ orders.updatedAt kolonu eklendi');
+            db.run(`UPDATE orders SET updatedAt = COALESCE(createdAt, CURRENT_TIMESTAMP) WHERE updatedAt IS NULL`, (updateErr) => {
+              if (updateErr) {
+                console.error('❌ orders.updatedAt doldurulamadı:', updateErr.message);
+              } else {
+                console.log('✓ orders.updatedAt kolonu mevcut createdAt değerleriyle dolduruldu');
+              }
+            });
+          }
+        });
+      } else {
+        // Kolon zaten var, eksik değerleri doldur (eski veriler için)
+        db.run(`UPDATE orders SET updatedAt = COALESCE(createdAt, CURRENT_TIMESTAMP) WHERE updatedAt IS NULL`, (updateErr) => {
+          if (updateErr) {
+            console.error('❌ orders.updatedAt doldurulamadı (mevcut kolon):', updateErr.message);
+          } else {
+            console.log('✓ orders.updatedAt kolonu eksik değerleri dolduruldu');
+          }
+        });
+      }
+    });
   });
 
   // Ödemeler
@@ -210,7 +228,26 @@ db.serialize(() => {
   
   // Varsayılan kullanıcı (şifre: admin)
   db.run(`INSERT OR IGNORE INTO users(username, password, role) VALUES('admin', 'admin', 'yönetici')`);
-  db.run(`INSERT OR IGNORE INTO users(username, password, role) VALUES('garson', 'garson', 'garson')`);
+  db.run(`INSERT OR IGNORE INTO users(username, password, role) VALUES('garson', 'garson', 'garson')`, (finalErr) => {
+    if (finalErr) {
+      console.error('❌ Varsayılan kullanıcılar eklenirken hata:', finalErr.message);
+    } else {
+      console.log('✓ Tüm tablolar ve migrasyonlar tamamlandı');
+      // Son bir kontrol: orders.updatedAt kolonunun var olduğundan emin ol
+      db.all(`PRAGMA table_info(orders)`, (checkErr, checkRows) => {
+        if (checkErr) {
+          console.error('❌ Son kontrol hatası:', checkErr.message);
+        } else {
+          const hasUpdatedAt = checkRows.some(r => r.name === 'updatedAt');
+          if (hasUpdatedAt) {
+            console.log('✓ orders.updatedAt kolonu mevcut ve hazır');
+          } else {
+            console.error('❌ KRİTİK: orders.updatedAt kolonu hala eksik!');
+          }
+        }
+      });
+    }
+  });
 });
 
 // Socket.io kaldırıldı - tek cihaz kullanımı
