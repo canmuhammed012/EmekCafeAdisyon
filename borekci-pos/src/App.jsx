@@ -78,12 +78,12 @@ function App() {
   return (
     <ThemeProvider>
       <SocketProvider>
-        <UpdateNotification />
-        <PaymentRequestNotification user={user} />
-        {showScreensaver && (
-          <Screensaver onDismiss={() => setShowScreensaver(false)} />
-        )}
         <Router>
+          <UpdateNotification />
+          <PaymentRequestNotification user={user} />
+          {showScreensaver && (
+            <Screensaver onDismiss={() => setShowScreensaver(false)} />
+          )}
           <Routes>
             <Route 
               path="/login" 

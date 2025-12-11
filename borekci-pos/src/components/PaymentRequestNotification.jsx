@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../services/socket';
 import { getPaymentRequests } from '../services/api';
 
@@ -8,7 +7,6 @@ const PaymentRequestNotification = ({ user }) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const blinkIntervalRef = useRef(null);
   const soundIntervalRef = useRef(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Sadece yönetici kullanıcılar için bildirim göster
@@ -175,8 +173,8 @@ const PaymentRequestNotification = ({ user }) => {
   // Hesabı Al butonuna basıldığında
   const handleAcceptPaymentRequest = () => {
     if (paymentRequest?.tableId) {
-      // Masa detay sayfasına yönlendir
-      navigate(`/table/${paymentRequest.tableId}`);
+      // Masa detay sayfasına yönlendir (HashRouter kullanıldığı için window.location.hash)
+      window.location.hash = `#/table/${paymentRequest.tableId}`;
       handleClosePaymentRequest();
     }
   };
