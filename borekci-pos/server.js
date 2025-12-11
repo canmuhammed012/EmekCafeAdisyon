@@ -1592,12 +1592,24 @@ app.post('/api/print/receipt', (req, res) => {
             selectedPrinter = printers[printerIndex];
             console.log('📌 Index ile yazıcı seçildi:', selectedPrinter.name);
           } else if (printerName) {
-            // Belirtilen yazıcıyı bul (case-insensitive, partial match)
-            selectedPrinter = printers.find(p => 
-              p.name.toLowerCase() === printerName.toLowerCase() || 
-              p.name.toLowerCase().includes(printerName.toLowerCase()) ||
-              printerName.toLowerCase().includes(p.name.toLowerCase())
-            );
+            // Belirtilen yazıcıyı bul (daha esnek eşleştirme)
+            const normalizedPrinterName = printerName.toLowerCase().trim();
+            selectedPrinter = printers.find(p => {
+              const normalizedPName = p.name.toLowerCase().trim();
+              // Tam eşleşme
+              if (normalizedPName === normalizedPrinterName) return true;
+              // İçeriyor mu kontrol et
+              if (normalizedPName.includes(normalizedPrinterName)) return true;
+              if (normalizedPrinterName.includes(normalizedPName)) return true;
+              // Tire, boşluk, parantez gibi karakterleri yok sayarak eşleştir
+              const cleanPName = normalizedPName.replace(/[-\s()]/g, '');
+              const cleanPrinterName = normalizedPrinterName.replace(/[-\s()]/g, '');
+              if (cleanPName === cleanPrinterName) return true;
+              if (cleanPName.includes(cleanPrinterName)) return true;
+              if (cleanPrinterName.includes(cleanPName)) return true;
+              return false;
+            });
+            
             if (!selectedPrinter) {
               console.error('❌ Belirtilen yazıcı bulunamadı:', printerName);
               console.log('📋 Mevcut yazıcılar:', printers.map(p => p.name));
@@ -1606,6 +1618,8 @@ app.post('/api/print/receipt', (req, res) => {
                 availablePrinters: printers.map(p => p.name)
               });
               return;
+            } else {
+              console.log('✅ Yazıcı bulundu:', selectedPrinter.name, '(aranan:', printerName + ')');
             }
           } else {
             // POS-80 veya benzeri yazıcıları öncelikle ara

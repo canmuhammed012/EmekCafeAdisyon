@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCategories, getProducts, createOrder } from '../services/api';
+import { getSocket } from '../services/socket';
 import Footer from '../components/Footer';
 import AlertModal from '../components/AlertModal';
 
@@ -55,6 +56,55 @@ const Menu = ({ user }) => {
       loadProductsLocal();
     }
   }, [selectedCategory]);
+
+  // Masa hesap isteği bildirimini dinle (anasayfada da dinle)
+  useEffect(() => {
+    let socket = null;
+    let isMounted = true;
+    
+    const setupPaymentRequestListener = async () => {
+      try {
+        socket = await getSocket();
+        if (!socket) {
+          console.warn('⚠ Socket bağlantısı kurulamadı (Menu)');
+          return;
+        }
+        
+        // Socket bağlantısını bekle
+        if (!socket.connected) {
+          socket.once('connect', () => {
+            console.log('✅ Socket bağlandı (Menu), listener ekleniyor...');
+            setupListener();
+          });
+        } else {
+          setupListener();
+        }
+        
+        function setupListener() {
+          socket.on('tableRequestPayment', (data) => {
+            console.log('📢 Masa hesap isteği alındı (Menu):', data);
+            if (!isMounted) return;
+            
+            // Anasayfada sadece log, admin panelinde modal gösterilir
+            // Socket event'i Admin.jsx'de de dinleniyor, orada modal gösterilecek
+          });
+          
+          console.log('✅ Masa hesap isteği listener eklendi (Menu)');
+        }
+      } catch (error) {
+        console.error('❌ Socket listener kurulum hatası (Menu):', error);
+      }
+    };
+    
+    setupPaymentRequestListener();
+    
+    return () => {
+      isMounted = false;
+      if (socket) {
+        socket.off('tableRequestPayment');
+      }
+    };
+  }, []);
 
   const handleAddProduct = async (productId) => {
     const quantity = parseInt(prompt('Adet girin:', '1')) || 1;

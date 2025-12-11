@@ -335,6 +335,15 @@ const TableDetail = ({ user }) => {
   };
 
   const handlePrintReceipt = async () => {
+    // Önce mevcut yazıcıları listele (debug için)
+    try {
+      const printersResponse = await fetch('/api/printers/windows');
+      const printersData = await printersResponse.json();
+      console.log('📋 Mevcut Windows yazıcıları:', printersData.printers?.map(p => p.name) || []);
+    } catch (e) {
+      console.warn('Yazıcı listesi alınamadı:', e);
+    }
+    
     // Öncelikli yazıcı adlarını topla
     const preferredPrinters = [
       localStorage.getItem('printerName')?.trim(),
@@ -343,6 +352,7 @@ const TableDetail = ({ user }) => {
       'XP-80'
     ].filter(Boolean);
 
+    console.log('🔍 Denenecek yazıcılar:', preferredPrinters);
     let lastError = null;
 
     for (const printerName of preferredPrinters) {
