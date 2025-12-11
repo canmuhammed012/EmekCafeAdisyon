@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -82,6 +82,10 @@
       {
         "from": "public/logo.ico",
         "to": "logo.ico"
+      },
+      {
+        "from": "public/logo.png",
+        "to": "logo.png"
       }
     ],
     "win": {

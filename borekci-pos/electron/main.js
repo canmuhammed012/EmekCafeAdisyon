@@ -24,26 +24,34 @@ function createWindow() {
   const minWidth = Math.max(800, Math.floor(width * 0.6));
   const minHeight = Math.max(600, Math.floor(height * 0.6));
   
-  // Icon path'i belirle
+  // Icon path'i belirle (Windows için .ico dosyası kullan)
   let iconPath;
   if (app.isPackaged) {
     // Production: Electron Builder logo'yu resources klasörüne koyar
     // Önce dist klasöründe ara (ASAR içinde), sonra resources klasöründe
     const appPath = app.getAppPath();
-    const distPath = path.join(appPath, 'logo.png'); // Vite public klasörünü dist'e kopyalar
-    const resourcesPath = path.join(process.resourcesPath, 'logo.png');
-    const publicPath = path.join(process.resourcesPath, 'public', 'logo.png');
+    const distPath = path.join(appPath, 'logo.ico'); // .ico dosyası
+    const resourcesPath = path.join(process.resourcesPath, 'logo.ico');
+    const publicPath = path.join(process.resourcesPath, 'public', 'logo.ico');
+    const extraResourcesPath = path.join(process.resourcesPath, 'logo.ico');
     
-    // Sırayla kontrol et
+    // Sırayla kontrol et (.ico dosyası için)
     if (fs.existsSync(distPath)) {
       iconPath = distPath;
     } else if (fs.existsSync(resourcesPath)) {
       iconPath = resourcesPath;
     } else if (fs.existsSync(publicPath)) {
       iconPath = publicPath;
+    } else if (fs.existsSync(extraResourcesPath)) {
+      iconPath = extraResourcesPath;
     } else {
-      // Fallback: app path'inde ara
-      iconPath = path.join(appPath, 'public', 'logo.png');
+      // Fallback: .png dosyası dene
+      const pngPath = path.join(process.resourcesPath, 'logo.png');
+      if (fs.existsSync(pngPath)) {
+        iconPath = pngPath;
+      } else {
+        iconPath = path.join(appPath, 'public', 'logo.ico');
+      }
     }
     
     console.log('🔍 Icon path aranıyor...');
@@ -52,10 +60,21 @@ function createWindow() {
     console.log('  Seçilen icon path:', iconPath);
     console.log('  Icon mevcut:', fs.existsSync(iconPath));
   } else {
-    // Development: public klasöründen
-    iconPath = path.join(__dirname, '..', 'public', 'logo.png');
+    // Development: public klasöründen al (.ico veya .png)
+    const icoPath = path.join(__dirname, '..', 'public', 'logo.ico');
+    const pngPath = path.join(__dirname, '..', 'public', 'logo.png');
+    if (fs.existsSync(icoPath)) {
+      iconPath = icoPath;
+    } else {
+      iconPath = pngPath;
+    }
     console.log('🔍 Development icon path:', iconPath);
     console.log('  Icon mevcut:', fs.existsSync(iconPath));
+  }
+  
+  // Windows için app user model ID ayarla (görev çubuğu simgesi için)
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.emekcafe.adisyon');
   }
   
   mainWindow = new BrowserWindow({

@@ -32,6 +32,9 @@ const TableDetail = ({ user }) => {
   const [showTableTransferModal, setShowTableTransferModal] = useState(false);
   const [tables, setTables] = useState([]);
   
+  // Hesap isteği başarı modalı için state
+  const [showPaymentRequestSuccess, setShowPaymentRequestSuccess] = useState(false);
+  
   // Tıklanan ürün için glow efekti state
   const [clickedProductId, setClickedProductId] = useState(null);
   
@@ -492,7 +495,10 @@ const TableDetail = ({ user }) => {
                          </h1>
                          {orders.length > 0 && (
                            <button
-                             onClick={handleOpenTableTransferModal}
+                             onClick={() => {
+                               playActionSound();
+                               handleOpenTableTransferModal();
+                             }}
                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 sm:py-1.5 px-2 sm:px-3 rounded-lg transition-all duration-150 transform active:scale-95 text-xs sm:text-sm flex items-center justify-center gap-1 w-fit"
                            >
                              <span>🔄</span>
@@ -508,7 +514,10 @@ const TableDetail = ({ user }) => {
                            {orders.length > 0 && (
                              <>
                                <button
-                                 onClick={() => handlePayment('Nakit')}
+                                 onClick={() => {
+                                   playActionSound();
+                                   handlePayment('Nakit');
+                                 }}
                                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                                >
                                  <span className="text-sm sm:text-base">💵</span>
@@ -516,7 +525,10 @@ const TableDetail = ({ user }) => {
                                  <span className="sm:hidden">Nakit</span>
                                </button>
                                <button
-                                 onClick={() => handlePayment('Kart')}
+                                 onClick={() => {
+                                   playActionSound();
+                                   handlePayment('Kart');
+                                 }}
                                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                                >
                                  <span className="text-sm sm:text-base">💳</span>
@@ -524,7 +536,10 @@ const TableDetail = ({ user }) => {
                                  <span className="sm:hidden">Kart</span>
                                </button>
                                <button
-                                 onClick={handlePrintReceipt}
+                                 onClick={() => {
+                                   playActionSound();
+                                   handlePrintReceipt();
+                                 }}
                                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                                  title="Fiş Yazdır"
                                >
@@ -535,14 +550,20 @@ const TableDetail = ({ user }) => {
                              </>
                            )}
                           <button
-                            onClick={handleExit}
+                            onClick={() => {
+                              playActionSound();
+                              handleExit();
+                            }}
                             className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                           >
                             <span className="text-sm sm:text-base">➜]</span>
                             <span>Çıkış</span>
                           </button>
                           <button
-                            onClick={() => navigate('/')}
+                            onClick={() => {
+                              playActionSound();
+                              navigate('/');
+                            }}
                             className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 sm:py-2 px-2 sm:px-3 md:px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm"
                           >
                             <span className="text-sm sm:text-base">✅</span>
@@ -713,7 +734,7 @@ const TableDetail = ({ user }) => {
                       playActionSound();
                       try {
                         await requestTablePayment(parseInt(id));
-                        alert('✅ Hesap isteği gönderildi!');
+                        setShowPaymentRequestSuccess(true);
                       } catch (error) {
                         console.error('Hesap isteği gönderilemedi:', error);
                         alert('❌ Hesap isteği gönderilemedi: ' + (error.response?.data?.error || error.message));
@@ -864,6 +885,27 @@ const TableDetail = ({ user }) => {
               className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-2xl transition shadow-lg"
             >
               Tamam
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Hesap İsteği Başarı Modalı */}
+      {showPaymentRequestSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+            <div className="mb-6">
+              <div className="text-5xl mb-4">📢</div>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+                Masa {id} Hesabı Alınmak Üzere Kasaya Yönlendirilmiştir.
+              </h2>
+            </div>
+            
+            <button
+              onClick={() => setShowPaymentRequestSuccess(false)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-150 transform active:scale-95 text-lg"
+            >
+              Tamamla
             </button>
           </div>
         </div>
