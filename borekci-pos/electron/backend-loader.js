@@ -1,126 +1,155 @@
-// Backend'i Electron main process içinde çalıştır
+// Backend'i ayrı Node.js process olarak çalıştır
 const path = require('path');
 const fs = require('fs');
+const { fork } = require('child_process');
 
+let serverProcess = null;
 let serverStarted = false;
 
 function startBackend() {
   return new Promise((resolve, reject) => {
     try {
-      console.log('\n=== BACKEND LOADER ===');
+      console.log('\n=== BACKEND LOADER v3 (fork) ===');
       
-      // Electron require() otomatik olarak ASAR içinde arar
-      // Production'da server.js ASAR dışında olmalı (asarUnpack ile)
       const { app } = require('electron');
-      let serverModulePath;
       
-      if (app.isPackaged) {
-        // Production: server.js ASAR dışında (app.asar.unpacked klasöründe)
-        // Electron Builder, asarUnpack ile belirtilen dosyaları app.asar.unpacked'a koyar
-        const appPath = app.getAppPath(); // app.asar path'i
-        const unpackedPath = appPath.replace('app.asar', 'app.asar.unpacked');
-        serverModulePath = path.join(unpackedPath, 'server.js');
-        
-        // Alternatif path'ler de dene
-        if (!fs.existsSync(serverModulePath)) {
-          const altPath1 = path.join(process.resourcesPath, 'app.asar.unpacked', 'server.js');
-          const altPath2 = path.join(process.resourcesPath, 'app', 'server.js');
-          const altPath3 = path.join(process.resourcesPath, 'server.js');
-          
-          if (fs.existsSync(altPath1)) {
-            serverModulePath = altPath1;
-          } else if (fs.existsSync(altPath2)) {
-            serverModulePath = altPath2;
-          } else if (fs.existsSync(altPath3)) {
-            serverModulePath = altPath3;
-          }
-        }
-      } else {
-        // Development: normal path
-        serverModulePath = path.join(__dirname, '..', 'server.js');
-      }
+      console.log('📍 Paths:');
+      console.log('   __dirname:', __dirname);
+      console.log('   app.getAppPath():', app.getAppPath());
+      console.log('   process.resourcesPath:', process.resourcesPath);
+      console.log('   app.isPackaged:', app.isPackaged);
       
-      console.log('Server module path:', serverModulePath);
-      console.log('__dirname:', __dirname);
-      console.log('App path:', app.isPackaged ? app.getAppPath() : 'development');
-      console.log('Server file exists:', fs.existsSync(serverModulePath));
-      
-      // Veritabanı yolu - userData kullan (ASAR dışında)
+      // Veritabanı yolu
       const userDataPath = app.getPath('userData');
       const dbPath = path.join(userDataPath, 'emekcafe.db');
-      console.log('📁 Veritabanı konumu:');
-      console.log('   UserData klasörü:', userDataPath);
-      console.log('   Veritabanı dosyası:', dbPath);
-      console.log('   Tam yol:', path.resolve(dbPath));
+      console.log('\n📁 Veritabanı:', dbPath);
       
-      // Environment variables
-      process.env.NODE_ENV = 'production';
-      process.env.PORT = '3000';
-      process.env.DB_PATH = dbPath;
+      // Server.js path'ini belirle
+      let serverPath;
+      let nodePath;
       
-      // Working directory - userData kullan (ASAR dışında, yazılabilir)
-      const workingDir = app.getPath('userData');
-      process.chdir(workingDir);
-      console.log('Working directory:', process.cwd());
-      
-      // Server'ı require et (Electron ASAR içinde otomatik arar)
-      console.log('\nServer require ediliyor...\n');
-      
-      try {
-        // Server dosyasının varlığını kontrol et
-        if (!fs.existsSync(serverModulePath)) {
-          throw new Error(`Server dosyası bulunamadı: ${serverModulePath}`);
-        }
+      if (app.isPackaged) {
+        // Production: server.js extraResources içinde
+        serverPath = path.join(process.resourcesPath, 'server.js');
         
-        // Absolute path kullan (require için)
-        const absolutePath = path.resolve(serverModulePath);
-        console.log('Requiring server from:', absolutePath);
-        require(absolutePath);
-        serverStarted = true;
+        // Native modüller için path'ler
+        const appPath = app.getAppPath();
+        const unpackedPath = appPath.replace('app.asar', 'app.asar.unpacked');
+        const nodeModulesPath = path.join(appPath, 'node_modules');
+        const unpackedNodeModulesPath = path.join(unpackedPath, 'node_modules');
         
-        // Backend hazır olana kadar bekle (HTTP isteği ile kontrol et)
-        const http = require('http');
-        let checkCount = 0;
-        const maxChecks = 50; // Maksimum 5 saniye (50 * 100ms)
+        // NODE_PATH için (path.delimiter = Windows'ta ";", Unix'te ":")
+        nodePath = [unpackedNodeModulesPath, nodeModulesPath].join(path.delimiter);
         
-        const checkBackend = setInterval(() => {
-          checkCount++;
-          const req = http.get('http://localhost:3000/api/health', { timeout: 200 }, (res) => {
-            if (res.statusCode === 200) {
-              // Backend hazır!
-              clearInterval(checkBackend);
-              console.log('✓ Backend hazır (API: http://localhost:3000)\n');
-              resolve();
-            }
-          });
-          req.on('error', () => {
-            // Henüz hazır değil, tekrar dene
-            if (checkCount >= maxChecks) {
-              clearInterval(checkBackend);
-              console.log('⚠ Backend başlatıldı (timeout - frontend devam edecek)\n');
-              resolve(); // Timeout olsa bile resolve et, frontend çalışabilir
-            }
-          });
-          req.on('timeout', () => {
-            req.destroy();
-          });
-        }, 100); // Her 100ms'de bir kontrol et
-      } catch (requireError) {
-        console.error('Server require hatası:', requireError);
-        console.error('Stack:', requireError.stack);
-        reject(requireError);
+        console.log('\n📂 Production paths:');
+        console.log('   Server:', serverPath);
+        console.log('   Server mevcut:', fs.existsSync(serverPath));
+        console.log('   NODE_PATH:', nodePath);
+        
+      } else {
+        // Development
+        serverPath = path.join(__dirname, '..', 'server.js');
+        nodePath = path.join(__dirname, '..', 'node_modules');
+        
+        console.log('\n📂 Development paths:');
+        console.log('   Server:', serverPath);
       }
       
+      // Server dosyası var mı kontrol et
+      if (!fs.existsSync(serverPath)) {
+        const error = new Error(`Server dosyası bulunamadı: ${serverPath}`);
+        console.error('❌', error.message);
+        reject(error);
+        return;
+      }
+      
+      console.log('\n🚀 Server fork ediliyor...');
+      
+      // Server'ı ayrı process olarak başlat
+      serverProcess = fork(serverPath, [], {
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          PORT: '3000',
+          DB_PATH: dbPath,
+          NODE_PATH: nodePath
+        },
+        stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
+        // ASAR unpacked klasörünü cwd olarak kullan
+        cwd: app.isPackaged 
+          ? app.getAppPath().replace('app.asar', 'app.asar.unpacked')
+          : path.dirname(serverPath)
+      });
+      
+      // Process stdout'u logla
+      serverProcess.stdout.on('data', (data) => {
+        console.log('[SERVER]', data.toString().trim());
+      });
+      
+      // Process stderr'ı logla
+      serverProcess.stderr.on('data', (data) => {
+        console.error('[SERVER ERROR]', data.toString().trim());
+      });
+      
+      // Process hataları
+      serverProcess.on('error', (error) => {
+        console.error('❌ Server process hatası:', error);
+        reject(error);
+      });
+      
+      // Process kapandığında
+      serverProcess.on('exit', (code, signal) => {
+        console.log(`🛑 Server process kapandı (code: ${code}, signal: ${signal})`);
+        serverStarted = false;
+        serverProcess = null;
+      });
+      
+      serverStarted = true;
+      console.log('✅ Server process başlatıldı (PID:', serverProcess.pid, ')');
+      
+      // Backend hazır olana kadar bekle
+      const http = require('http');
+      let checkCount = 0;
+      const maxChecks = 50;
+      
+      console.log('\n🔍 Backend health check...');
+      
+      const checkBackend = setInterval(() => {
+        checkCount++;
+        const req = http.get('http://localhost:3000/api/health', { timeout: 200 }, (res) => {
+          if (res.statusCode === 200) {
+            clearInterval(checkBackend);
+            console.log('✅ Backend hazır! (http://localhost:3000)');
+            console.log('=== BACKEND LOADER TAMAMLANDI ===\n');
+            resolve();
+          }
+        });
+        req.on('error', () => {
+          if (checkCount >= maxChecks) {
+            clearInterval(checkBackend);
+            console.log('⚠️ Health check timeout (5s) - ama process çalışıyor');
+            console.log('=== BACKEND LOADER TAMAMLANDI (timeout) ===\n');
+            resolve();
+          }
+        });
+        req.on('timeout', () => req.destroy());
+      }, 100);
+      
     } catch (error) {
-      console.error('Backend loader hatası:', error);
+      console.error('\n❌ BACKEND LOADER HATASI!');
+      console.error('   Mesaj:', error.message);
+      console.error('   Stack:', error.stack);
       reject(error);
     }
   });
 }
 
 function stopBackend() {
-  if (serverStarted) {
-    console.log('Backend kapatılıyor...');
+  if (serverProcess) {
+    console.log('🛑 Server process durduruluyor...');
+    serverProcess.kill('SIGTERM');
+    serverProcess = null;
+    serverStarted = false;
   }
 }
 

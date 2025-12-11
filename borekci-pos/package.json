@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.9.6",
+  "version": "1.9.11",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -70,9 +70,7 @@
       "**/node_modules/sqlite3/**/*",
       "**/node_modules/usb/**/*",
       "**/node_modules/escpos-usb/**/*",
-      "**/node_modules/node-printer/**/*",
-      "dist/**/*",
-      "server.js"
+      "**/node_modules/node-printer/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -90,6 +88,10 @@
       {
         "from": "public/logo.png",
         "to": "logo.png"
+      },
+      {
+        "from": "server.js",
+        "to": "server.js"
       }
     ],
     "win": {

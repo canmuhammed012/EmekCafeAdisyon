@@ -1681,6 +1681,7 @@ app.post('/api/print/receipt', (req, res) => {
           console.error('❌ Genel yazdırma hatası:', error);
           res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
         }
+        } // printToWindowsPrinter fonksiyonu sonu
       });
     });
   });
