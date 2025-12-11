@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import UpdateNotification from './components/UpdateNotification';
+import PaymentRequestNotification from './components/PaymentRequestNotification';
 import Screensaver from './components/Screensaver';
 import Login from './pages/Login';
 import Tables from './pages/Tables';
@@ -78,6 +79,7 @@ function App() {
     <ThemeProvider>
       <SocketProvider>
         <UpdateNotification />
+        <PaymentRequestNotification user={user} />
         {showScreensaver && (
           <Screensaver onDismiss={() => setShowScreensaver(false)} />
         )}

@@ -337,7 +337,10 @@ const TableDetail = ({ user }) => {
   const handlePrintReceipt = async () => {
     // Önce mevcut yazıcıları listele (debug için)
     try {
-      const printersResponse = await fetch('/api/printers/windows');
+      // API URL'ini doğru şekilde al
+      const serverIP = localStorage.getItem('serverIP');
+      const apiBase = serverIP ? `http://${serverIP}:3000/api` : 'http://localhost:3000/api';
+      const printersResponse = await fetch(`${apiBase}/printers/windows`);
       const printersData = await printersResponse.json();
       console.log('📋 Mevcut Windows yazıcıları:', printersData.printers?.map(p => p.name) || []);
     } catch (e) {
