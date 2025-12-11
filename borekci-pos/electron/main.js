@@ -110,6 +110,15 @@ function createWindow() {
   
   // Frontend'den tema değişikliklerini dinle
   mainWindow.webContents.on('did-finish-load', () => {
+    // Icon'u tekrar ayarla (güncelleme sonrası veya her yüklemede)
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.emekcafe.adisyon');
+      // Icon'u tekrar set et (güncelleme sonrası için)
+      if (iconPath && fs.existsSync(iconPath)) {
+        mainWindow.setIcon(iconPath);
+      }
+    }
+    
     // localStorage'dan tema bilgisini oku
     mainWindow.webContents.executeJavaScript(`
       (function() {
@@ -347,15 +356,26 @@ ipcMain.on('get-version', (event) => {
   event.returnValue = app.getVersion();
 });
 
+// Güncelleme kurulumu için IPC handler
+ipcMain.on('install-update', () => {
+  // Icon'u tekrar ayarla (güncelleme kurulumu öncesi)
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.emekcafe.adisyon');
+  }
+  // Uygulamayı kapat ve güncellemeyi kur
+  autoUpdater.quitAndInstall(false, true);
+});
+
 // Windows için app user model ID'yi en başta ayarla (güncelleme sonrası icon için)
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.emekcafe.adisyon');
 }
 
 app.whenReady().then(() => {
-  // Icon'u tekrar ayarla (güncelleme sonrası için)
+  // Icon'u tekrar ayarla (güncelleme sonrası için - her başlatmada)
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.emekcafe.adisyon');
+    console.log('✅ App User Model ID ayarlandı: com.emekcafe.adisyon');
   }
   
   createWindow();
@@ -592,26 +612,8 @@ if (app.isPackaged) {
       app.setAppUserModelId('com.emekcafe.adisyon');
     }
     
-    // Kullanıcıya dialog göster
-    const { dialog } = require('electron');
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Güncelleme Hazır',
-      message: `Yeni sürüm (${info.version}) indirildi!`,
-      detail: 'Uygulamayı yeniden başlatmak için Tamam\'a tıklayın. Güncelleme otomatik olarak kurulacaktır.',
-      buttons: ['Tamam', 'Sonra'],
-      defaultId: 0,
-      cancelId: 1
-    }).then((result) => {
-      if (result.response === 0) {
-        // Icon'u tekrar ayarla (güncelleme kurulumu öncesi)
-        if (process.platform === 'win32') {
-          app.setAppUserModelId('com.emekcafe.adisyon');
-        }
-        // Kullanıcı Tamam'a tıkladı - uygulamayı yeniden başlat ve güncellemeyi kur
-        autoUpdater.quitAndInstall(false, true);
-      }
-    });
+    // Dialog kaldırıldı - artık modal kullanılıyor
+    // Renderer process'te modal gösterilecek
   });
   
   autoUpdater.on('error', (error) => {

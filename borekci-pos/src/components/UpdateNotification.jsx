@@ -84,18 +84,49 @@ const UpdateNotification = () => {
     );
   }
 
-  // Güncelleme indirildi - Yeniden başlatma gerekiyor
+  // Güncelleme indirildi - Modal göster
   if (updateInfo?.status === 'downloaded') {
+    const handleInstallNow = () => {
+      if (window.electron && window.electron.ipcRenderer) {
+        window.electron.ipcRenderer.send('install-update');
+      }
+    };
+
+    const handleInstallLater = () => {
+      setUpdateInfo(null);
+    };
+
     return (
-      <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-4 rounded-lg shadow-2xl z-50 min-w-[300px]">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">✅</div>
-          <div className="flex-1">
-            <p className="font-bold">Güncelleme Hazır!</p>
-            <p className="text-sm opacity-90">Versiyon: {updateInfo.version}</p>
-            <p className="text-xs mt-1 opacity-75">
-              Uygulamayı yeniden başlatın
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+          <div className="mb-6">
+            <div className="text-6xl mb-4">🚀</div>
+            <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
+              Güncelleme Hazır
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-2">
+              Yeni sürüm ({updateInfo.version}) indirildi!
             </p>
+            <p className="text-base text-gray-500 dark:text-gray-400">
+              Uygulamayı yeniden başlatarak bu güncellemeyi hemen yükleyebilir veya daha sonra yüklemek üzere erteleyebilirsiniz.
+            </p>
+          </div>
+          
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={handleInstallNow}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-150 transform active:scale-95 text-lg flex items-center justify-center gap-2"
+            >
+              <span>🚀</span>
+              <span>Güncellemeyi Şimdi Yükle</span>
+            </button>
+            <button
+              onClick={handleInstallLater}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-150 transform active:scale-95 text-lg flex items-center justify-center gap-2"
+            >
+              <span>⏳</span>
+              <span>Daha Sonra Yükle</span>
+            </button>
           </div>
         </div>
       </div>
