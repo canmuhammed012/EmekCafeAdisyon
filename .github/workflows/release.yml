@@ -18,12 +18,31 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-    
+
+    - name: Clean electron-builder cache
+      shell: pwsh
+      run: |
+        $paths = @(
+          "$env:LOCALAPPDATA\\electron-builder",
+          "$env:USERPROFILE\\.cache\\electron-builder"
+        )
+        foreach ($p in $paths) {
+          if (Test-Path $p) {
+            Write-Host "Removing $p"
+            Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue
+          }
+        }
+        $customCache = Join-Path $env:RUNNER_TEMP "electron-builder"
+        New-Item -ItemType Directory -Force -Path $customCache | Out-Null
+        "ELECTRON_BUILDER_CACHE=$customCache" | Out-File -FilePath $env:GITHUB_ENV -Append
+
     - name: Install dependencies
       run: npm ci
       working-directory: ./borekci-pos
     
     - name: Build application
+      env:
+        ELECTRON_BUILDER_CACHE: ${{ env.ELECTRON_BUILDER_CACHE }}
       run: npm run build:electron
       working-directory: ./borekci-pos
       env:
