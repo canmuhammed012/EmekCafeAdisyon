@@ -116,21 +116,60 @@ jobs:
       shell: powershell
       continue-on-error: false
     
+    - name: Hazır notu oku (release_notes.md)
+      id: notes
+      shell: pwsh
+      run: |
+        $tag = "${{ github.ref_name }}"
+        $ver = $tag.TrimStart('v')
+        $notesFile = "borekci-pos/release_notes.md"
+        $title = $tag
+        $body = $tag
+        if (Test-Path $notesFile) {
+          $lines = Get-Content $notesFile
+          # Satırı "vX.Y.Z - metin" formatında ara
+          $match = $lines | Where-Object { $_ -match "^$tag\s*-\s*" } | Select-Object -First 1
+          if (-not $match) {
+            $match = $lines | Where-Object { $_ -match "^$ver\s*-\s*" } | Select-Object -First 1
+          }
+          if ($match) {
+            # Başlık: ilk satır
+            $title = $match
+            # Body: Eşleşen satırdan itibaren boş satır veya dosya sonuna kadar
+            $start = ($lines | FindIndex { $_ -eq $match })
+            if ($start -ge 0) {
+              $rest = $lines[$start..($lines.Length-1)]
+              $body = ($rest -join "`n").Trim()
+            } else {
+              $body = $match
+            }
+          }
+        }
+        Write-Host "title=$title"
+        Write-Host "body<<'EOF'"
+        Write-Host $body
+        Write-Host "EOF"
+        # Çıktılara yaz
+        echo "title=$title" >> $env:GITHUB_OUTPUT
+        echo "body<<EOF" >> $env:GITHUB_OUTPUT
+        echo $body >> $env:GITHUB_OUTPUT
+        echo "EOF" >> $env:GITHUB_OUTPUT
+        # Basit fallback için de env
+        echo "NOTES_TITLE=$title" >> $env:GITHUB_ENV
+        echo "NOTES_BODY=$body" >> $env:GITHUB_ENV
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        body: |
-          ## Version ${{ github.ref_name }}
-          
-          Automatic update release.
+        name: ${{ steps.notes.outputs.title }}
+        body: ${{ steps.notes.outputs.body }}
         files: |
           borekci-pos/release/*.exe
           borekci-pos/release/*.exe.blockmap
           borekci-pos/release/*.yml
         draft: false
         prerelease: false
-        generate_release_notes: true
+        generate_release_notes: false
         token: ${{ secrets.GITHUB_TOKEN }}
 
