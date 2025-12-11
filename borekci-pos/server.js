@@ -157,14 +157,23 @@ db.serialize(() => {
   )`);
 
   // Mevcut sipariş tablosuna updatedAt kolonu ekle (eğer yoksa) ve değerleri doldur
-  db.run(`ALTER TABLE orders ADD COLUMN updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
-    if (err && !/duplicate column/i.test(err.message)) {
-      console.error('❌ orders.updatedAt kolonu eklenemedi:', err.message);
-    } else if (!err) {
-      console.log('✓ orders.updatedAt kolonu eklendi');
-      db.run(`UPDATE orders SET updatedAt = createdAt WHERE updatedAt IS NULL`, (updateErr) => {
-        if (updateErr) {
-          console.error('❌ orders.updatedAt doldurulamadı:', updateErr.message);
+  db.all(`PRAGMA table_info(orders)`, (infoErr, rows) => {
+    if (infoErr) {
+      console.error('❌ orders tablosu şema okunamadı:', infoErr.message);
+      return;
+    }
+    const hasUpdatedAt = rows.some(r => r.name === 'updatedAt');
+    if (!hasUpdatedAt) {
+      db.run(`ALTER TABLE orders ADD COLUMN updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
+        if (err && !/duplicate column/i.test(err.message)) {
+          console.error('❌ orders.updatedAt kolonu eklenemedi:', err.message);
+        } else {
+          console.log('✓ orders.updatedAt kolonu eklendi');
+          db.run(`UPDATE orders SET updatedAt = createdAt WHERE updatedAt IS NULL`, (updateErr) => {
+            if (updateErr) {
+              console.error('❌ orders.updatedAt doldurulamadı:', updateErr.message);
+            }
+          });
         }
       });
     }
