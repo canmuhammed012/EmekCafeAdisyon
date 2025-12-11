@@ -43,16 +43,25 @@ jobs:
           Write-Host "Removing existing node_modules..."
           Remove-Item "borekci-pos\node_modules" -Recurse -Force -ErrorAction SilentlyContinue
         }
+        npm cache clean --force
 
-    - name: Install dependencies
+    - name: Install dependencies (mirror, retry once)
       env:
         ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         ELECTRON_CUSTOM_DIR: electron/
-      run: |
-        npm config set electron_mirror $env:ELECTRON_MIRROR
-        npm config set electron_custom_dir $env:ELECTRON_CUSTOM_DIR
-        npm ci
+        npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
+        npm_config_electron_custom_dir: electron/
+      shell: pwsh
       working-directory: ./borekci-pos
+      run: |
+        Write-Host "npm ci (attempt 1) with electron mirror..."
+        if (!(npm ci)) {
+          Write-Host "First npm ci failed. Cleaning node_modules and retrying..."
+          if (Test-Path "node_modules") { Remove-Item "node_modules" -Recurse -Force -ErrorAction SilentlyContinue }
+          npm cache clean --force
+          Start-Sleep -Seconds 3
+          npm ci
+        }
     
     - name: Build application
       env:
