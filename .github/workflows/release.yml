@@ -251,14 +251,12 @@ jobs:
         Write-Host "body<<'EOF'"
         Write-Host $body
         Write-Host "EOF"
-        # Çıktılara yaz
+        # Çıktılara yaz (GITHUB_OUTPUT multiline destekler)
+        $delimiter = "EOF_$(New-Guid)"
         echo "title=$title" >> $env:GITHUB_OUTPUT
-        echo "body<<EOF" >> $env:GITHUB_OUTPUT
+        echo "body<<$delimiter" >> $env:GITHUB_OUTPUT
         echo $body >> $env:GITHUB_OUTPUT
-        echo "EOF" >> $env:GITHUB_OUTPUT
-        # Basit fallback için de env
-        echo "NOTES_TITLE=$title" >> $env:GITHUB_ENV
-        echo "NOTES_BODY=$body" >> $env:GITHUB_ENV
+        echo "$delimiter" >> $env:GITHUB_OUTPUT
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
