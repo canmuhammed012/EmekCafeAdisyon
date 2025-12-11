@@ -36,8 +36,22 @@ jobs:
         New-Item -ItemType Directory -Force -Path $customCache | Out-Null
         "ELECTRON_BUILDER_CACHE=$customCache" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+    - name: Clean node_modules (defensive)
+      shell: pwsh
+      run: |
+        if (Test-Path "borekci-pos\node_modules") {
+          Write-Host "Removing existing node_modules..."
+          Remove-Item "borekci-pos\node_modules" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
     - name: Install dependencies
-      run: npm ci
+      env:
+        ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+        ELECTRON_CUSTOM_DIR: electron/
+      run: |
+        npm config set electron_mirror $env:ELECTRON_MIRROR
+        npm config set electron_custom_dir $env:ELECTRON_CUSTOM_DIR
+        npm ci
       working-directory: ./borekci-pos
     
     - name: Build application
