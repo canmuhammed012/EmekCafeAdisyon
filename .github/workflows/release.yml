@@ -69,13 +69,29 @@ jobs:
           }
         }
     
-    - name: Build application
+    - name: Build application (electron mirror, retry once)
       env:
         ELECTRON_BUILDER_CACHE: ${{ env.ELECTRON_BUILDER_CACHE }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: npm run build:electron
+        ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+        ELECTRON_CUSTOM_DIR: electron/
+        npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
+        npm_config_electron_custom_dir: electron/
+      shell: pwsh
       working-directory: ./borekci-pos
+      run: |
+        Write-Host "electron-builder attempt 1 (with mirror)..."
+        npm run build:electron
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "electron-builder attempt 1 failed. Retrying after short wait..."
+          Start-Sleep -Seconds 5
+          npm run build:electron
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "electron-builder failed after retry."
+            exit $LASTEXITCODE
+          }
+        }
     
     - name: List release files
       run: |
