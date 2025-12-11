@@ -72,6 +72,10 @@ export const getDailyReport = (date) => {
   const url = date ? `/reports/daily?date=${date}` : '/reports/daily';
   return api.get(url);
 };
+export const getHourlyReport = (date) => {
+  const url = date ? `/reports/hourly?date=${date}` : '/reports/hourly';
+  return api.get(url);
+};
 
 // Settings
 export const getSettings = () => api.get('/settings');

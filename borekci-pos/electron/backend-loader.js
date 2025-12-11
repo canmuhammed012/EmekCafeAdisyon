@@ -10,13 +10,42 @@ function startBackend() {
       console.log('\n=== BACKEND LOADER ===');
       
       // Electron require() otomatik olarak ASAR içinde arar
-      // Relative path kullan (__dirname electron/ klasörü)
-      const serverModulePath = path.join(__dirname, '..', 'server.js');
+      // Production'da server.js ASAR dışında olmalı (asarUnpack ile)
+      const { app } = require('electron');
+      let serverModulePath;
+      
+      if (app.isPackaged) {
+        // Production: server.js ASAR dışında (app.asar.unpacked klasöründe)
+        // Electron Builder, asarUnpack ile belirtilen dosyaları app.asar.unpacked'a koyar
+        const appPath = app.getAppPath(); // app.asar path'i
+        const unpackedPath = appPath.replace('app.asar', 'app.asar.unpacked');
+        serverModulePath = path.join(unpackedPath, 'server.js');
+        
+        // Alternatif path'ler de dene
+        if (!fs.existsSync(serverModulePath)) {
+          const altPath1 = path.join(process.resourcesPath, 'app.asar.unpacked', 'server.js');
+          const altPath2 = path.join(process.resourcesPath, 'app', 'server.js');
+          const altPath3 = path.join(process.resourcesPath, 'server.js');
+          
+          if (fs.existsSync(altPath1)) {
+            serverModulePath = altPath1;
+          } else if (fs.existsSync(altPath2)) {
+            serverModulePath = altPath2;
+          } else if (fs.existsSync(altPath3)) {
+            serverModulePath = altPath3;
+          }
+        }
+      } else {
+        // Development: normal path
+        serverModulePath = path.join(__dirname, '..', 'server.js');
+      }
+      
       console.log('Server module path:', serverModulePath);
       console.log('__dirname:', __dirname);
+      console.log('App path:', app.isPackaged ? app.getAppPath() : 'development');
+      console.log('Server file exists:', fs.existsSync(serverModulePath));
       
       // Veritabanı yolu - userData kullan (ASAR dışında)
-      const { app } = require('electron');
       const userDataPath = app.getPath('userData');
       const dbPath = path.join(userDataPath, 'emekcafe.db');
       console.log('📁 Veritabanı konumu:');
@@ -38,8 +67,15 @@ function startBackend() {
       console.log('\nServer require ediliyor...\n');
       
       try {
-        // Relative path ile require - Electron ASAR-aware
-        require(serverModulePath);
+        // Server dosyasının varlığını kontrol et
+        if (!fs.existsSync(serverModulePath)) {
+          throw new Error(`Server dosyası bulunamadı: ${serverModulePath}`);
+        }
+        
+        // Absolute path kullan (require için)
+        const absolutePath = path.resolve(serverModulePath);
+        console.log('Requiring server from:', absolutePath);
+        require(absolutePath);
         serverStarted = true;
         
         // Backend hazır olana kadar bekle (HTTP isteği ile kontrol et)

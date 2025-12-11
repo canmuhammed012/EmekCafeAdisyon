@@ -15,6 +15,7 @@ import {
   deleteTable,
   getDailyReport,
   getPayments,
+  getHourlyReport,
   updateCategoriesSort,
   updateProductsSort,
 } from '../services/api';
@@ -23,6 +24,7 @@ import { formatDateTR, formatTimeTR } from '../utils/dateFormatter';
 import { getSocket } from '../services/socket';
 import Footer from '../components/Footer';
 import AlertModal from '../components/AlertModal';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 // Hex rengi RGB'ye çevir (yardımcı fonksiyon)
 const hexToRgb = (hex) => {
@@ -43,6 +45,8 @@ const Admin = ({ user }) => {
   const [report, setReport] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [payments, setPayments] = useState([]);
+  const [hourlyData, setHourlyData] = useState([]);
+  const [hourlyLoading, setHourlyLoading] = useState(false);
   
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '', color: '#3B82F6' });
@@ -145,6 +149,19 @@ const Admin = ({ user }) => {
           cardRevenue: 0
         });
         setPayments([]);
+      }
+    };
+
+    const loadHourlyReport = async () => {
+      setHourlyLoading(true);
+      try {
+        const response = await getHourlyReport(selectedDate);
+        setHourlyData(response.data || []);
+      } catch (error) {
+        console.error('Saatlik rapor yüklenemedi:', error);
+        setHourlyData([]);
+      } finally {
+        setHourlyLoading(false);
       }
     };
 
@@ -779,10 +796,15 @@ const Admin = ({ user }) => {
         {/* Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md mb-4 mx-2 sm:mx-4">
           <div className="flex flex-wrap border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-            {['categories', 'products', 'tables', 'report'].map((tab) => (
+            {['categories', 'products', 'tables', 'hourly', 'report'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === 'hourly') {
+                    loadHourlyReport();
+                  }
+                }}
                 className={`px-4 sm:px-6 md:px-8 py-3 sm:py-4 md:py-5 font-bold text-sm sm:text-base md:text-lg transition whitespace-nowrap ${
                   activeTab === tab
                     ? 'border-b-4 border-blue-600 text-blue-600'
@@ -792,6 +814,7 @@ const Admin = ({ user }) => {
                 {tab === 'categories' && 'Kategoriler'}
                 {tab === 'products' && 'Ürünler'}
                 {tab === 'tables' && 'Masalar'}
+                {tab === 'hourly' && 'Saatlik Tüketim Analizi'}
                 {tab === 'report' && 'Gün Sonu Raporu'}
               </button>
             ))}
@@ -1396,6 +1419,132 @@ const Admin = ({ user }) => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Hourly Analysis Tab */}
+            {activeTab === 'hourly' && (
+              <div className="space-y-6">
+                {/* Tarih Seçici */}
+                <div className="flex flex-wrap gap-4 items-center">
+                  <label className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    Tarih Seçin:
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      loadHourlyReport();
+                    }}
+                    className="px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {hourlyLoading ? (
+                  <div className="text-center py-8">
+                    <div className="text-xl">Yükleniyor...</div>
+                  </div>
+                ) : hourlyData.length > 0 ? (
+                  <div className="space-y-8">
+                    {/* Saatlik Toplam Satış Grafiği */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+                        Saatlik Toplam Satış Miktarı
+                      </h2>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <BarChart data={hourlyData.map(h => ({
+                          hour: h.hourLabel,
+                          totalQuantity: h.products.reduce((sum, p) => sum + p.quantity, 0)
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="hour" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="totalQuantity" fill="#3B82F6" name="Toplam Satış (Adet)" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* En Çok Satılan Ürünler - Saat Bazında */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+                        Saat Bazında En Çok Satılan Ürünler
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {hourlyData
+                          .filter(h => h.products.length > 0)
+                          .map((hourData) => (
+                            <div key={hourData.hour} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                              <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-3">
+                                {hourData.hourLabel}
+                              </h3>
+                              <div className="space-y-2">
+                                {hourData.products.slice(0, 5).map((product, idx) => (
+                                  <div key={product.productId} className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                      {idx + 1}. {product.productName}
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-800 dark:text-white">
+                                      {product.quantity} adet
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Ürün Bazında Saatlik Dağılım */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                      <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">
+                        Ürün Bazında Saatlik Satış Trendi (En Çok Satılan 10 Ürün)
+                      </h2>
+                      <ResponsiveContainer width="100%" height={500}>
+                        <LineChart data={hourlyData.map(h => {
+                          const dataPoint = { hourLabel: h.hourLabel };
+                          // Her ürün için saatlik veriyi ekle
+                          h.products.forEach(p => {
+                            dataPoint[`product_${p.productId}`] = p.quantity;
+                          });
+                          return dataPoint;
+                        })}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="hourLabel" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          {hourlyData.length > 0 && hourlyData[0].products.slice(0, 10).map((product, idx) => {
+                            const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'];
+                            return (
+                              <Line
+                                key={product.productId}
+                                type="monotone"
+                                dataKey={`product_${product.productId}`}
+                                name={product.productName}
+                                stroke={colors[idx % colors.length]}
+                                strokeWidth={2}
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-lg text-gray-600 dark:text-gray-400">
+                      Seçilen tarih için saatlik satış verisi bulunamadı.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

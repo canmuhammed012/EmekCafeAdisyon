@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -38,6 +38,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5",
+    "recharts": "^3.5.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.7",
@@ -68,7 +69,10 @@
     "asarUnpack": [
       "**/node_modules/sqlite3/**/*",
       "**/node_modules/usb/**/*",
-      "dist/**/*"
+      "**/node_modules/escpos-usb/**/*",
+      "**/node_modules/node-printer/**/*",
+      "dist/**/*",
+      "server.js"
     ],
     "files": [
       "dist/**/*",

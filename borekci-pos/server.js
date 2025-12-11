@@ -896,6 +896,58 @@ app.get('/api/reports/daily', (req, res) => {
   });
 });
 
+// Saatlik satış analizi endpoint'i
+app.get('/api/reports/hourly', (req, res) => {
+  const date = req.query.date || new Date().toISOString().split('T')[0];
+  
+  // Saatlik satış verilerini çek (ürün bazında)
+  // Her saat için hangi ürünlerin ne kadar satıldığını göster
+  db.all(`SELECT 
+    strftime('%H', datetime(o.createdAt, '+3 hours')) as hour,
+    p.name as productName,
+    p.id as productId,
+    SUM(o.quantity) as totalQuantity,
+    SUM(o.total) as totalRevenue
+    FROM orders o
+    JOIN products p ON o.productId = p.id
+    WHERE DATE(datetime(o.createdAt, '+3 hours')) = ?
+    GROUP BY hour, p.id, p.name
+    ORDER BY hour, totalQuantity DESC`, [date], (err, rows) => {
+    if (err) {
+      console.error('Saatlik analiz hatası:', err);
+      res.status(400).json({ error: err.message });
+    } else {
+      // Veriyi saat bazında grupla
+      const hourlyData = {};
+      
+      rows.forEach(row => {
+        const hour = parseInt(row.hour);
+        if (!hourlyData[hour]) {
+          hourlyData[hour] = [];
+        }
+        hourlyData[hour].push({
+          productId: row.productId,
+          productName: row.productName,
+          quantity: row.totalQuantity,
+          revenue: row.totalRevenue
+        });
+      });
+      
+      // Tüm saatler için boş array'ler oluştur (0-23)
+      const result = [];
+      for (let hour = 0; hour < 24; hour++) {
+        result.push({
+          hour: hour,
+          hourLabel: `${hour.toString().padStart(2, '0')}:00`,
+          products: hourlyData[hour] || []
+        });
+      }
+      
+      res.json(result);
+    }
+  });
+});
+
 // ========== AYARLAR ==========
 
 // Ayarları getir
