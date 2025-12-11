@@ -154,7 +154,7 @@ jobs:
             # Başlık: ilk satır
             $title = $match
             # Body: Eşleşen satırdan itibaren boş satır veya dosya sonuna kadar
-            $start = ($lines | FindIndex { $_ -eq $match })
+            $start = [Array]::IndexOf($lines, $match)
             if ($start -ge 0) {
               $rest = $lines[$start..($lines.Length-1)]
               $body = ($rest -join "`n").Trim()
