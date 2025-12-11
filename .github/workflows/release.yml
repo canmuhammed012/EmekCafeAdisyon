@@ -36,31 +36,37 @@ jobs:
         New-Item -ItemType Directory -Force -Path $customCache | Out-Null
         "ELECTRON_BUILDER_CACHE=$customCache" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    - name: Clean node_modules (defensive)
-      shell: pwsh
-      run: |
-        if (Test-Path "borekci-pos\node_modules") {
-          Write-Host "Removing existing node_modules..."
-          Remove-Item "borekci-pos\node_modules" -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        npm cache clean --force
-
-    - name: Install dependencies (mirror, retry once)
-      env:
-        ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-        ELECTRON_CUSTOM_DIR: electron/
-        npm_config_electron_mirror: https://npmmirror.com/mirrors/electron/
-        npm_config_electron_custom_dir: electron/
+    - name: Install dependencies (retry with electron mirror on failure)
       shell: pwsh
       working-directory: ./borekci-pos
       run: |
-        Write-Host "npm ci (attempt 1) with electron mirror..."
-        if (!(npm ci)) {
-          Write-Host "First npm ci failed. Cleaning node_modules and retrying..."
-          if (Test-Path "node_modules") { Remove-Item "node_modules" -Recurse -Force -ErrorAction SilentlyContinue }
-          npm cache clean --force
+        $ErrorActionPreference = "Continue"
+        function Clean-Modules {
+          Write-Host "Cleaning node_modules and npm cache..."
+          if (Test-Path "node_modules") {
+            cmd /c rmdir /s /q node_modules 2>$null
+            Remove-Item "node_modules" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          npm cache clean --force | Out-Null
+        }
+
+        Clean-Modules
+
+        Write-Host "npm ci (attempt 1, default registry)..."
+        npm ci
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Attempt 1 failed. Retrying with electron mirror..."
+          Clean-Modules
+          $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+          $env:ELECTRON_CUSTOM_DIR = "electron/"
+          $env:npm_config_electron_mirror = $env:ELECTRON_MIRROR
+          $env:npm_config_electron_custom_dir = $env:ELECTRON_CUSTOM_DIR
           Start-Sleep -Seconds 3
           npm ci
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Attempt 2 failed."
+            exit $LASTEXITCODE
+          }
         }
     
     - name: Build application
