@@ -36,7 +36,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path $customCache | Out-Null
         "ELECTRON_BUILDER_CACHE=$customCache" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-    - name: Install dependencies (retry with electron mirror on failure)
+    - name: Install dependencies (electron mirror, retry once)
       shell: pwsh
       working-directory: ./borekci-pos
       run: |
@@ -52,15 +52,15 @@ jobs:
 
         Clean-Modules
 
-        Write-Host "npm ci (attempt 1, default registry)..."
+        # Always prefer mirror to avoid GitHub 503/404
+        $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+        $env:npm_config_electron_mirror = $env:ELECTRON_MIRROR
+
+        Write-Host "npm ci (attempt 1, electron mirror)..."
         npm ci
         if ($LASTEXITCODE -ne 0) {
-          Write-Host "Attempt 1 failed. Retrying with electron mirror..."
+          Write-Host "Attempt 1 failed. Retrying after clean..."
           Clean-Modules
-          $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
-          $env:ELECTRON_CUSTOM_DIR = "electron/"
-          $env:npm_config_electron_mirror = $env:ELECTRON_MIRROR
-          $env:npm_config_electron_custom_dir = $env:ELECTRON_CUSTOM_DIR
           Start-Sleep -Seconds 3
           npm ci
           if ($LASTEXITCODE -ne 0) {
