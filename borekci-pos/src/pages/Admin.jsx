@@ -116,10 +116,26 @@ const Admin = ({ user }) => {
           getDailyReport(selectedDate),
           getPayments(selectedDate)
         ]);
-        setReport(reportResponse.data);
-        setPayments(paymentsResponse.data);
+        // Report null olsa bile boş obje olarak set et (sayfa boş kalmasın)
+        setReport(reportResponse.data || {
+          totalTables: 0,
+          totalPayments: 0,
+          totalRevenue: 0,
+          cashRevenue: 0,
+          cardRevenue: 0
+        });
+        setPayments(paymentsResponse.data || []);
       } catch (error) {
         console.error('Rapor yüklenemedi:', error);
+        // Hata durumunda da boş değerler set et
+        setReport({
+          totalTables: 0,
+          totalPayments: 0,
+          totalRevenue: 0,
+          cashRevenue: 0,
+          cardRevenue: 0
+        });
+        setPayments([]);
       }
     };
 
@@ -334,10 +350,26 @@ const Admin = ({ user }) => {
         getDailyReport(reportDate),
         getPayments(reportDate)
       ]);
-      setReport(reportResponse.data);
-      setPayments(paymentsResponse.data);
+      // Report null olsa bile boş obje olarak set et (sayfa boş kalmasın)
+      setReport(reportResponse.data || {
+        totalTables: 0,
+        totalPayments: 0,
+        totalRevenue: 0,
+        cashRevenue: 0,
+        cardRevenue: 0
+      });
+      setPayments(paymentsResponse.data || []);
     } catch (error) {
       console.error('Rapor yüklenemedi:', error);
+      // Hata durumunda da boş değerler set et
+      setReport({
+        totalTables: 0,
+        totalPayments: 0,
+        totalRevenue: 0,
+        cashRevenue: 0,
+        cardRevenue: 0
+      });
+      setPayments([]);
     }
   };
 
@@ -1373,31 +1405,31 @@ const Admin = ({ user }) => {
                       <div className="p-5 bg-blue-50 dark:bg-blue-900 rounded-lg shadow-md">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Toplam Masa</p>
                         <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                          {report.totalTables}
+                          {report.totalTables || 0}
                         </p>
                       </div>
                       <div className="p-5 bg-green-50 dark:bg-green-900 rounded-lg shadow-md">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Toplam Ödeme</p>
                         <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                          {report.totalPayments}
+                          {report.totalPayments || 0}
                         </p>
                       </div>
                       <div className="p-5 bg-purple-50 dark:bg-purple-900 rounded-lg shadow-md">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Toplam Ciro</p>
                         <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                          {report.totalRevenue.toFixed(2)} ₺
+                          {(report.totalRevenue || 0).toFixed(2)} ₺
                         </p>
                       </div>
                       <div className="p-5 bg-yellow-50 dark:bg-yellow-900 rounded-lg shadow-md">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Nakit</p>
                         <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-                          {report.cashRevenue.toFixed(2)} ₺
+                          {(report.cashRevenue || 0).toFixed(2)} ₺
                         </p>
                       </div>
                       <div className="p-5 bg-indigo-50 dark:bg-indigo-900 rounded-lg shadow-md">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Kart</p>
                         <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                          {report.cardRevenue.toFixed(2)} ₺
+                          {(report.cardRevenue || 0).toFixed(2)} ₺
                         </p>
                       </div>
                     </div>
@@ -1455,7 +1487,7 @@ const Admin = ({ user }) => {
                         </div>
                       ) : (
                         <p className="text-center py-8 text-gray-600 dark:text-gray-400">
-                          Bu tarih için ödeme kaydı bulunamadı.
+                          Henüz Bir Satış Gerçekleştirilmemiştir.
                         </p>
                       )}
                     </div>

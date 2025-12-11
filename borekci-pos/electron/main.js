@@ -4,6 +4,11 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
+// Windows için app user model ID'yi en başta ayarla (güncelleme sonrası icon için)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.emekcafe.adisyon');
+}
+
 let mainWindow;
 let backendLoader;
 let themeCheckInterval;
@@ -342,7 +347,17 @@ ipcMain.on('get-version', (event) => {
   event.returnValue = app.getVersion();
 });
 
+// Windows için app user model ID'yi en başta ayarla (güncelleme sonrası icon için)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.emekcafe.adisyon');
+}
+
 app.whenReady().then(() => {
+  // Icon'u tekrar ayarla (güncelleme sonrası için)
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.emekcafe.adisyon');
+  }
+  
   createWindow();
 
   // Production'da DevTools'u açmak için global shortcut ekle
@@ -572,6 +587,11 @@ if (app.isPackaged) {
       mainWindow.webContents.send('update-downloaded', info.version);
     }
     
+    // Icon'u tekrar ayarla (güncelleme öncesi - görev çubuğu icon'u için)
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.emekcafe.adisyon');
+    }
+    
     // Kullanıcıya dialog göster
     const { dialog } = require('electron');
     dialog.showMessageBox(mainWindow, {
@@ -584,6 +604,10 @@ if (app.isPackaged) {
       cancelId: 1
     }).then((result) => {
       if (result.response === 0) {
+        // Icon'u tekrar ayarla (güncelleme kurulumu öncesi)
+        if (process.platform === 'win32') {
+          app.setAppUserModelId('com.emekcafe.adisyon');
+        }
         // Kullanıcı Tamam'a tıkladı - uygulamayı yeniden başlat ve güncellemeyi kur
         autoUpdater.quitAndInstall(false, true);
       }
