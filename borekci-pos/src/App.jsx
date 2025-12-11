@@ -17,7 +17,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showScreensaver, setShowScreensaver] = useState(false);
   const inactivityTimerRef = useRef(null);
-  const INACTIVITY_TIMEOUT = 30000; // 30 saniye
+  const ENABLE_AUTO_SCREENSAVER = false; // Otomatik ekran koruyucu devre dışı
 
   useEffect(() => {
     // Kullanıcı bilgisini localStorage'dan kontrol et
@@ -33,58 +33,28 @@ function App() {
     setLoading(false);
   }, []);
 
-  // Ekran koruyucu için inaktivite takibi
+  // Otomatik ekran koruyucu devre dışı (sadece kilit tuşu ile açılacak)
   useEffect(() => {
-    // Sadece kullanıcı giriş yaptıysa ekran koruyucuyu aktif et
-    if (!user) {
-      setShowScreensaver(false);
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-      return;
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
     }
-
-    // Ekran koruyucu açıksa timer'ı durdur
-    if (showScreensaver) {
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-      return;
-    }
-
-    const resetInactivityTimer = () => {
-      // Mevcut timer'ı temizle
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-
-      // Yeni timer başlat
-      inactivityTimerRef.current = setTimeout(() => {
-        setShowScreensaver(true);
-      }, INACTIVITY_TIMEOUT);
-    };
-
-    // İlk timer'ı başlat
-    resetInactivityTimer();
-
-    // Tüm etkileşim event'lerini dinle (mousemove hariç - çok hassas)
-    const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'keydown'];
-    events.forEach(event => {
-      window.addEventListener(event, resetInactivityTimer, { passive: true });
-    });
-
-    // Cleanup
+    // Cleanup: hiçbir timer eklenmediği için sadece clear
     return () => {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
       }
-      events.forEach(event => {
-        window.removeEventListener(event, resetInactivityTimer);
-      });
     };
   }, [user, showScreensaver]);
 
   // Global keydown listener kaldırıldı - sesler sadece aksiyonlarda çalacak
+
+  const openScreensaver = useCallback(() => {
+    // Manuel açıldığında mevcut inaktivite sayacını durdur
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    setShowScreensaver(true);
+  }, []);
 
   const handleLogin = useCallback((userData) => {
     setUser(userData);
@@ -119,7 +89,7 @@ function App() {
             />
             <Route 
               path="/" 
-              element={user ? <Tables user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
+              element={user ? <Tables user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
             />
             <Route 
               path="/table/:id" 
@@ -131,7 +101,7 @@ function App() {
             />
             <Route 
               path="/admin" 
-              element={user?.role === 'yönetici' ? <Admin user={user} /> : <Navigate to="/login" replace />} 
+              element={user?.role === 'yönetici' ? <Admin user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
             />
           </Routes>
         </Router>

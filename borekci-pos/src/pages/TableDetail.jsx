@@ -262,20 +262,34 @@ const TableDetail = ({ user }) => {
     playActionSound();
     
     try {
-      // Mevcut siparişlerde bu ürün var mı kontrol et
-      const existingOrder = orders.find(order => order.productId === productId);
-      
-      if (existingOrder) {
-        // Eğer varsa, miktarını artır
-        await updateOrder(existingOrder.id, { quantity: existingOrder.quantity + 1 });
+      // Aynı ürünün en son eklenen siparişini bul (updatedAt > createdAt ise onu kullan)
+      const latestSameProduct = orders
+        .filter(order => order.productId === productId)
+        .reduce((latest, order) => {
+          const time = new Date(order.updatedAt || order.createdAt).getTime();
+          if (!latest || time > latest.time) {
+            return { ...order, time };
+          }
+          return latest;
+        }, null);
+
+      const now = Date.now();
+      const withinOneMinute = latestSameProduct 
+        ? (now - latestSameProduct.time) <= 60 * 1000
+        : false;
+
+      if (withinOneMinute) {
+        // 1 dakika içinde aynı ürün tekrar eklendiyse miktarı artır
+        await updateOrder(latestSameProduct.id, { quantity: latestSameProduct.quantity + 1 });
       } else {
-        // Yoksa yeni sipariş oluştur
+        // 1 dakikadan sonra yeni bir sipariş olarak ekle
         await createOrder({
           tableId: parseInt(id),
           productId,
           quantity: 1,
         });
       }
+
       // Kullanıcı aksiyonu sonrası manuel güncelleme
       loadOrders();
       // Diğer sayfalara bildir
@@ -321,26 +335,41 @@ const TableDetail = ({ user }) => {
   };
 
   const handlePrintReceipt = async () => {
-    try {
-      const response = await printReceipt(parseInt(id), 0);
-      if (response.data.success) {
-        setAlertModal({
-          isOpen: true,
-          title: 'Başarılı',
-          message: response.data.message,
-          type: 'success'
-        });
+    // Öncelikli yazıcı adlarını topla
+    const preferredPrinters = [
+      localStorage.getItem('printerName')?.trim(),
+      localStorage.getItem('printerNameAlt')?.trim(),
+      'POS-80',
+      'XP-80'
+    ].filter(Boolean);
+
+    let lastError = null;
+
+    for (const printerName of preferredPrinters) {
+      try {
+        const response = await printReceipt(parseInt(id), printerName, 'windows');
+        if (response.data?.success) {
+          setAlertModal({
+            isOpen: true,
+            title: 'Başarılı',
+            message: response.data.message || `Fiş yazdırıldı (${printerName})`,
+            type: 'success'
+          });
+          return;
+        }
+        lastError = response.data?.error || 'Fiş yazdırılamadı';
+      } catch (error) {
+        console.error(`Fiş yazdırma hatası (${printerName}):`, error);
+        lastError = error.response?.data?.error || error.message;
       }
-    } catch (error) {
-      console.error('Fiş yazdırma hatası:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Fiş yazdırılamadı';
-      setAlertModal({
-        isOpen: true,
-        title: 'Hata',
-        message: errorMessage,
-        type: 'error'
-      });
     }
+
+    setAlertModal({
+      isOpen: true,
+      title: 'Hata',
+      message: lastError || 'Fiş yazdırılamadı',
+      type: 'error'
+    });
   };
 
   // Masa değiştirme fonksiyonu
@@ -393,24 +422,24 @@ const TableDetail = ({ user }) => {
       // Snapshot ile mevcut siparişleri karşılaştır
       const snapshotMap = new Map();
       ordersSnapshot.forEach(order => {
-        snapshotMap.set(order.productId, order);
+        snapshotMap.set(order.id, order);
       });
       
       const currentMap = new Map();
       currentOrders.forEach(order => {
-        currentMap.set(order.productId, order);
+        currentMap.set(order.id, order);
       });
       
       // Yeni eklenen siparişleri sil (snapshot'ta yok ama şu anda var)
-      for (const [productId, currentOrder] of currentMap) {
-        if (!snapshotMap.has(productId)) {
+      for (const [orderId, currentOrder] of currentMap) {
+        if (!snapshotMap.has(orderId)) {
           await deleteOrder(currentOrder.id);
         }
       }
       
       // Silinen siparişleri geri ekle ve miktarları güncelle
-      for (const [productId, snapshotOrder] of snapshotMap) {
-        if (!currentMap.has(productId)) {
+      for (const [orderId, snapshotOrder] of snapshotMap) {
+        if (!currentMap.has(orderId)) {
           // Snapshot'ta var ama şu anda yok - geri ekle
           await createOrder({
             tableId: parseInt(id),
@@ -419,7 +448,7 @@ const TableDetail = ({ user }) => {
           });
         } else {
           // Her ikisinde de var - miktarı snapshot'a göre güncelle
-          const currentOrder = currentMap.get(productId);
+          const currentOrder = currentMap.get(orderId);
           if (currentOrder.quantity !== snapshotOrder.quantity) {
             await updateOrder(currentOrder.id, { quantity: snapshotOrder.quantity });
           }
@@ -803,7 +832,9 @@ const TableDetail = ({ user }) => {
                 </p>
               ) : (
                 <div className="flex-1 overflow-y-auto min-h-0" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 0.7vw, 0.75rem)' }}>
-                  {[...orders].reverse().map((order) => (
+                  {[...orders].reverse().map((order) => {
+                    const orderTime = order.updatedAt || order.createdAt;
+                    return (
                     <div
                       key={order.id}
                       className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50"
@@ -825,13 +856,13 @@ const TableDetail = ({ user }) => {
                       </h3>
                       
                       {/* Ekleme saati - Ürün adının altında */}
-                      {order.createdAt && (
+                      {orderTime && (
                         <p className="text-gray-500 dark:text-gray-400 text-center" style={{ 
                           fontSize: 'clamp(0.6rem, 0.8vw, 0.7rem)',
                           lineHeight: '1.2',
                           width: '100%'
                         }}>
-                          {formatTimeTR(order.createdAt)}
+                          {formatTimeTR(orderTime)}
                         </p>
                       )}
                       
@@ -898,7 +929,8 @@ const TableDetail = ({ user }) => {
                         SİL
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

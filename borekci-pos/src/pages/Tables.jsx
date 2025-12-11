@@ -6,7 +6,7 @@ import { onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import { playActionSound } from '../utils/sound';
 import Footer from '../components/Footer';
 
-const Tables = ({ user, onLogout }) => {
+const Tables = ({ user, onLogout, onOpenScreensaver }) => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -93,20 +93,29 @@ const Tables = ({ user, onLogout }) => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-2">
+            <button
+              onClick={onOpenScreensaver}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-1"
+              title="Ekran koruyucuyu aç"
+            >
+              <span role="img" aria-label="kilit">🔒</span>
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition"
+              title="Tema değiştir"
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
             {user.role === 'yönetici' && (
               <button
                 onClick={() => navigate('/admin')}
                 className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+                title="Yönetim"
               >
                 Yönetim
               </button>
             )}
-            <button
-              onClick={toggleTheme}
-              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition"
-            >
-              {darkMode ? '☀️' : '🌙'}
-            </button>
             <button
               onClick={onLogout}
               className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-red-600 hover:bg-red-700 text-white rounded-lg transition"

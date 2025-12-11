@@ -1,3 +1,53 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver (örn: 1.9.16)"
+        required: true
+      release_notes:
+        description: "Release notu (opsiyonel)"
+        required: false
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Versiyon güncelle
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version
+
+      - name: Bağımlılıkları yükle
+        run: npm ci
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Electron paket ve publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --publish always
+
+      - name: Release notu güncelle
+        if: ${{ inputs.release_notes != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit v${{ inputs.version }} --notes "${{ inputs.release_notes }}"
 name: Build and Release
 
 on:

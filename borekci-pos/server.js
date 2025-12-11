@@ -12,6 +12,7 @@ const printer = require('node-printer');
 
 const app = express();
 const server = http.createServer(app);
+const pendingPaymentRequests = [];
 
 // Socket.io yapılandırması - ağ üzerinden çalışacak
 const io = socketIo(server, {
@@ -150,9 +151,24 @@ db.serialize(() => {
     quantity INTEGER,
     total REAL,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(tableId) REFERENCES tables(id),
     FOREIGN KEY(productId) REFERENCES products(id)
   )`);
+
+  // Mevcut sipariş tablosuna updatedAt kolonu ekle (eğer yoksa) ve değerleri doldur
+  db.run(`ALTER TABLE orders ADD COLUMN updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
+    if (err && !/duplicate column/i.test(err.message)) {
+      console.error('❌ orders.updatedAt kolonu eklenemedi:', err.message);
+    } else if (!err) {
+      console.log('✓ orders.updatedAt kolonu eklendi');
+      db.run(`UPDATE orders SET updatedAt = createdAt WHERE updatedAt IS NULL`, (updateErr) => {
+        if (updateErr) {
+          console.error('❌ orders.updatedAt doldurulamadı:', updateErr.message);
+        }
+      });
+    }
+  });
 
   // Ödemeler
   db.run(`CREATE TABLE IF NOT EXISTS payments (
@@ -566,6 +582,7 @@ app.put('/api/products/sort', (req, res) => {
 // Sipariş ekle
 app.post('/api/orders', (req, res) => {
   const { tableId, productId, quantity } = req.body;
+  const MERGE_WINDOW_SECONDS = 60; // 1 dakika
   
   // Ürün fiyatını al
   db.get(`SELECT price FROM products WHERE id = ?`, [productId], (err, product) => {
@@ -574,29 +591,68 @@ app.post('/api/orders', (req, res) => {
       return;
     }
     
-    const total = product.price * quantity;
-    
-    db.run(`INSERT INTO orders(tableId, productId, quantity, total) VALUES(?,?,?,?)`,
-      [tableId, productId, quantity, total],
-      function(err) {
-        if (err) res.status(400).json({error: err.message});
-        else {
-          updateTableTotal(tableId); // Bu fonksiyon hem total hem status'u güncelliyor
-          broadcast('orderCreated', {id: this.lastID, tableId, productId, quantity, total});
-          res.json({id: this.lastID});
+    // Son 60 saniyede aynı ürün için eklenmiş sipariş var mı kontrol et (SQL seviyesinde, timezone bağımsız)
+    db.get(
+      `SELECT id, quantity, updatedAt, createdAt 
+       FROM orders 
+       WHERE tableId = ? 
+         AND productId = ? 
+         AND (strftime('%s','now') - strftime('%s', COALESCE(updatedAt, createdAt))) <= ?
+       ORDER BY COALESCE(updatedAt, createdAt) DESC 
+       LIMIT 1`,
+      [tableId, productId, MERGE_WINDOW_SECONDS],
+      (findErr, lastOrder) => {
+        if (findErr) {
+          res.status(400).json({error: findErr.message});
+          return;
         }
-      });
+
+        const shouldMerge = Boolean(lastOrder);
+
+        if (shouldMerge) {
+          const newQuantity = lastOrder.quantity + quantity;
+          const total = product.price * newQuantity;
+          db.run(
+            `UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+            [newQuantity, total, lastOrder.id],
+            function(updateErr) {
+              if (updateErr) {
+                res.status(400).json({error: updateErr.message});
+              } else {
+                updateTableTotal(tableId);
+                broadcast('orderUpdated', {id: lastOrder.id, quantity: newQuantity, total, tableId});
+                res.json({id: lastOrder.id, merged: true});
+              }
+            }
+          );
+        } else {
+          const total = product.price * quantity;
+          db.run(
+            `INSERT INTO orders(tableId, productId, quantity, total, updatedAt) VALUES(?,?,?,?,CURRENT_TIMESTAMP)`,
+            [tableId, productId, quantity, total],
+            function(insertErr) {
+              if (insertErr) res.status(400).json({error: insertErr.message});
+              else {
+                updateTableTotal(tableId); // Bu fonksiyon hem total hem status'u güncelliyor
+                broadcast('orderCreated', {id: this.lastID, tableId, productId, quantity, total});
+                res.json({id: this.lastID, merged: false});
+              }
+            }
+          );
+        }
+      }
+    );
   });
 });
 
 // Siparişleri listele (masa bazlı)
 app.get('/api/orders/:tableId', (req, res) => {
   const tableId = req.params.tableId;
-  db.all(`SELECT orders.id, orders.productId, products.name, products.price, orders.quantity, orders.total, orders.createdAt 
+  db.all(`SELECT orders.id, orders.productId, products.name, products.price, orders.quantity, orders.total, orders.createdAt, orders.updatedAt 
           FROM orders 
           JOIN products ON orders.productId = products.id 
           WHERE orders.tableId = ? 
-          ORDER BY orders.createdAt DESC`, [tableId], (err, rows) => {
+          ORDER BY COALESCE(orders.updatedAt, orders.createdAt) DESC`, [tableId], (err, rows) => {
     if (err) res.status(400).json({error: err.message});
     else res.json(rows);
   });
@@ -621,7 +677,7 @@ app.put('/api/orders/:id', (req, res) => {
       
       const total = product.price * quantity;
       
-      db.run(`UPDATE orders SET quantity = ?, total = ? WHERE id = ?`,
+      db.run(`UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
         [quantity, total, id], function(err) {
         if (err) res.status(400).json({error: err.message});
         else {
@@ -719,7 +775,7 @@ app.post('/api/orders/transfer', (req, res) => {
                 return;
               }
               const total = product.price * order.newQuantity;
-              db.run(`UPDATE orders SET quantity = ?, total = ? WHERE tableId = ? AND productId = ?`,
+              db.run(`UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE tableId = ? AND productId = ?`,
                 [order.newQuantity, total, toTableId, order.productId], (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -737,7 +793,7 @@ app.post('/api/orders/transfer', (req, res) => {
                 return;
               }
               const total = product.price * order.quantity;
-              db.run(`INSERT INTO orders(tableId, productId, quantity, total) VALUES(?,?,?,?)`,
+              db.run(`INSERT INTO orders(tableId, productId, quantity, total, updatedAt) VALUES(?,?,?,?,CURRENT_TIMESTAMP)`,
                 [toTableId, order.productId, order.quantity, total], (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -864,9 +920,26 @@ app.post('/api/tables/:tableId/request-payment', (req, res) => {
       tableId: table.id,
       tableName: table.name || `Masa ${table.id}`
     });
+    // Fallback için in-memory kuyruğa ekle
+    pendingPaymentRequests.push({
+      tableId: table.id,
+      tableName: table.name || `Masa ${table.id}`,
+      createdAt: new Date().toISOString()
+    });
+    // Kuyruğu makul boyutta tut
+    if (pendingPaymentRequests.length > 20) {
+      pendingPaymentRequests.shift();
+    }
     
     res.json({success: true, message: 'Hesap isteği gönderildi'});
   });
+});
+
+// Bekleyen hesap isteklerini getir (admin polling fallback)
+app.get('/api/payment-requests', (req, res) => {
+  const items = [...pendingPaymentRequests];
+  pendingPaymentRequests.length = 0; // Tüket
+  res.json({ requests: items });
 });
 
 // ========== RAPORLAR ==========

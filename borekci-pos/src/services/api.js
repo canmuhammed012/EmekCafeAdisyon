@@ -35,6 +35,7 @@ export const createTable = (data) => api.post('/tables', data);
 export const updateTable = (id, data) => api.put(`/tables/${id}`, data);
 export const deleteTable = (id) => api.delete(`/tables/${id}`);
 export const requestTablePayment = (tableId) => api.post(`/tables/${tableId}/request-payment`);
+export const getPaymentRequests = () => api.get('/payment-requests');
 
 // Categories
 export const getCategories = () => api.get('/categories');
@@ -89,7 +90,13 @@ export const getReceipt = (tableId) => api.get(`/receipt/${tableId}`);
 
 // Printers
 export const getPrinters = () => api.get('/printers');
-export const printReceipt = (tableId, printerIndex = 0) => api.post('/print/receipt', { tableId, printerIndex });
+// printerType: 'windows' | 'usb' | 'auto'
+// printerName: Windows yazıcı adı (örn: "XP-80", "POS-80")
+export const printReceipt = (tableId, printerName = null, printerType = 'windows') => {
+  const payload = { tableId, printerType };
+  if (printerName) payload.printerName = printerName;
+  return api.post('/print/receipt', payload);
+};
 
 // Server Info
 export const getServerInfo = () => api.get('/server/info');

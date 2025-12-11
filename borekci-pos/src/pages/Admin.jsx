@@ -18,10 +18,12 @@ import {
   getHourlyReport,
   updateCategoriesSort,
   updateProductsSort,
+  getPaymentRequests,
 } from '../services/api';
 import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import { formatDateTR, formatTimeTR } from '../utils/dateFormatter';
 import { getSocket } from '../services/socket';
+import { useTheme } from '../contexts/ThemeContext';
 import Footer from '../components/Footer';
 import AlertModal from '../components/AlertModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -36,8 +38,9 @@ const hexToRgb = (hex) => {
   } : { r: 59, g: 130, b: 246 };
 };
 
-const Admin = ({ user }) => {
+const Admin = ({ user, onLogout, onOpenScreensaver }) => {
   const navigate = useNavigate();
+  const { darkMode, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('categories');
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -224,6 +227,7 @@ const Admin = ({ user }) => {
   useEffect(() => {
     let socket = null;
     let isMounted = true;
+    let pollTimer = null;
     
     const setupPaymentRequestListener = async () => {
       try {
@@ -303,6 +307,50 @@ const Admin = ({ user }) => {
     };
     
     setupPaymentRequestListener();
+
+    // Fallback: 5 saniyede bir bekleyen hesap isteklerini poll et
+    const poll = async () => {
+      try {
+        const response = await getPaymentRequests();
+        const items = response.data?.requests || [];
+        if (items.length > 0) {
+          const latest = items[items.length - 1];
+          setPaymentRequest(latest);
+          setIsBlinking(true);
+
+          if (blinkIntervalRef.current) clearInterval(blinkIntervalRef.current);
+          blinkIntervalRef.current = setInterval(() => setIsBlinking(prev => !prev), 500);
+
+          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+          const playSound = () => {
+            try {
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const oscillator = audioContext.createOscillator();
+              const gainNode = audioContext.createGain();
+
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+
+              oscillator.frequency.value = 1000;
+              oscillator.type = 'sine';
+              
+              gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.2);
+            } catch (error) {
+              console.warn('Ses çalınamadı (poll):', error);
+            }
+          };
+          playSound();
+          soundIntervalRef.current = setInterval(playSound, 2000);
+        }
+      } catch (err) {
+        // sessizce geç
+      }
+    };
+    pollTimer = setInterval(poll, 5000);
     
     return () => {
       isMounted = false;
@@ -314,6 +362,9 @@ const Admin = ({ user }) => {
       }
       if (soundIntervalRef.current) {
         clearInterval(soundIntervalRef.current);
+      }
+      if (pollTimer) {
+        clearInterval(pollTimer);
       }
     };
   }, []);
@@ -781,7 +832,7 @@ const Admin = ({ user }) => {
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
       <div className="flex-1 pt-4">
         {/* Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 mb-4 mx-2 sm:mx-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6 mb-4 mx-2 sm:mx-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div>
             <button
               onClick={() => navigate('/')}
@@ -790,6 +841,36 @@ const Admin = ({ user }) => {
               ← Ana Sayfa
             </button>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 dark:text-white">Yönetim Paneli</h1>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onOpenScreensaver}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-1"
+              title="Ekran koruyucuyu aç"
+            >
+              <span role="img" aria-label="kilit">🔒</span>
+            </button>
+            <button
+              onClick={toggleTheme}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition"
+              title="Tema değiştir"
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
+            <button
+              onClick={() => navigate('/admin')}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+              title="Yönetim"
+            >
+              Yönetim
+            </button>
+            <button
+              onClick={onLogout}
+              className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
+              title="Çıkış"
+            >
+              Çıkış
+            </button>
           </div>
         </div>
 
