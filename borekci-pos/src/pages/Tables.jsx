@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { getTables } from '../services/api';
 import { onUpdate, UPDATE_TYPES } from '../services/broadcast';
+import { playActionSound } from '../utils/sound';
 import Footer from '../components/Footer';
 
 const Tables = ({ user, onLogout }) => {
@@ -136,7 +137,10 @@ const Tables = ({ user, onLogout }) => {
               return (
                 <div
                   key={table.id}
-                  onClick={() => navigate(`/table/${table.id}`)}
+                  onClick={() => {
+                    playActionSound();
+                    navigate(`/table/${table.id}`);
+                  }}
                   className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 sm:p-3 md:p-4 cursor-pointer hover:shadow-2xl transition transform hover:scale-105 overflow-hidden border-2 min-h-[100px] sm:min-h-[110px] md:min-h-[120px] ${
                     isDolu ? 'border-red-500' : isBos ? 'border-green-500' : 'border-gray-400'
                   }`}

@@ -592,7 +592,7 @@ app.post('/api/orders', (req, res) => {
 // Siparişleri listele (masa bazlı)
 app.get('/api/orders/:tableId', (req, res) => {
   const tableId = req.params.tableId;
-  db.all(`SELECT orders.id, orders.productId, products.name, products.price, orders.quantity, orders.total 
+  db.all(`SELECT orders.id, orders.productId, products.name, products.price, orders.quantity, orders.total, orders.createdAt 
           FROM orders 
           JOIN products ON orders.productId = products.id 
           WHERE orders.tableId = ? 
@@ -838,6 +838,34 @@ app.get('/api/payments', (req, res) => {
   db.all(query, params, (err, rows) => {
     if (err) res.status(400).json({error: err.message});
     else res.json(rows);
+  });
+});
+
+// ========== MASA HESAP İSTEĞİ ==========
+
+// Masa hesap isteği gönder (garson tarafından)
+app.post('/api/tables/:tableId/request-payment', (req, res) => {
+  const tableId = parseInt(req.params.tableId);
+  
+  // Masa var mı kontrol et
+  db.get('SELECT id, name FROM tables WHERE id = ?', [tableId], (err, table) => {
+    if (err) {
+      res.status(400).json({error: err.message});
+      return;
+    }
+    
+    if (!table) {
+      res.status(404).json({error: 'Masa bulunamadı'});
+      return;
+    }
+    
+    // Socket üzerinden admin'e bildirim gönder
+    broadcast('tableRequestPayment', {
+      tableId: table.id,
+      tableName: table.name || `Masa ${table.id}`
+    });
+    
+    res.json({success: true, message: 'Hesap isteği gönderildi'});
   });
 });
 

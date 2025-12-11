@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, printReceipt } from '../services/api';
+import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, printReceipt, requestTablePayment } from '../services/api';
 import { getExchangeRates, convertWithDiscount } from '../services/currency';
 import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
+import { formatTimeTR } from '../utils/dateFormatter';
+import { playActionSound } from '../utils/sound';
 import Footer from '../components/Footer';
 
 const TableDetail = ({ user }) => {
@@ -219,6 +221,7 @@ const TableDetail = ({ user }) => {
       return;
     }
 
+    playActionSound();
     try {
       await updateOrder(orderId, { quantity: newQuantity });
       loadOrders();
@@ -230,6 +233,7 @@ const TableDetail = ({ user }) => {
   };
 
   const handleDeleteOrder = async (orderId) => {
+    playActionSound();
     try {
       await deleteOrder(orderId);
       loadOrders();
@@ -243,6 +247,7 @@ const TableDetail = ({ user }) => {
   const handleAddProduct = async (productId) => {
     // Glow efekti için state set et
     setClickedProductId(productId);
+    playActionSound();
     
     try {
       // Mevcut siparişlerde bu ürün var mı kontrol et
@@ -699,6 +704,29 @@ const TableDetail = ({ user }) => {
               </div>
             )}
               </div>
+              
+              {/* Masayı Hesaba Yolla Butonu - Ürünler box'ının altında */}
+              {orders.length > 0 && user?.role !== 'yönetici' && (
+                <div className="mt-2 flex-shrink-0">
+                  <button
+                    onClick={async () => {
+                      playActionSound();
+                      try {
+                        await requestTablePayment(parseInt(id));
+                        alert('✅ Hesap isteği gönderildi!');
+                      } catch (error) {
+                        console.error('Hesap isteği gönderilemedi:', error);
+                        alert('❌ Hesap isteği gönderilemedi: ' + (error.response?.data?.error || error.message));
+                      }
+                    }}
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-150 transform active:scale-95 flex items-center justify-center gap-2"
+                    style={{ fontSize: 'clamp(0.8rem, 1vw, 0.9rem)' }}
+                  >
+                    <span>📢</span>
+                    <span>Masayı Hesaba Yolla</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Sağ taraf - Siparişler (Dikey Liste) - Sabit genişlik, itmesin */}
@@ -730,6 +758,17 @@ const TableDetail = ({ user }) => {
                       }}>
                         {order.name}
                       </h3>
+                      
+                      {/* Ekleme saati - Ürün adının altında */}
+                      {order.createdAt && (
+                        <p className="text-gray-500 dark:text-gray-400 text-center" style={{ 
+                          fontSize: 'clamp(0.6rem, 0.8vw, 0.7rem)',
+                          lineHeight: '1.2',
+                          width: '100%'
+                        }}>
+                          {formatTimeTR(order.createdAt)}
+                        </p>
+                      )}
                       
                       {/* + 1 - Butonları - Ortada, yan yana */}
                       <div className="flex items-center justify-center" style={{ gap: 'clamp(0.5rem, 0.8vw, 1rem)' }}>

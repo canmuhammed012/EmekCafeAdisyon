@@ -31,6 +31,7 @@ const SOCKET_EVENTS = {
   TABLE_UPDATED: 'tableUpdated',
   TABLE_DELETED: 'tableDeleted',
   TABLE_TOTAL_UPDATED: 'tableTotalUpdated',
+  TABLE_REQUEST_PAYMENT: 'tableRequestPayment',
   CATEGORY_CREATED: 'categoryCreated',
   CATEGORY_UPDATED: 'categoryUpdated',
   CATEGORY_DELETED: 'categoryDeleted',
