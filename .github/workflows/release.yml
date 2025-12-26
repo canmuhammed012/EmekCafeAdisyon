@@ -14,6 +14,30 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Update package.json version from tag
+      shell: pwsh
+      working-directory: ./borekci-pos
+      run: |
+        $tag = "${{ github.ref_name }}"
+        $version = $tag.TrimStart('v')
+        Write-Host "Tag: $tag"
+        Write-Host "Version: $version"
+        
+        # Read package.json
+        $packageJson = Get-Content package.json | ConvertFrom-Json
+        Write-Host "Current version in package.json: $($packageJson.version)"
+        
+        # Update version
+        $packageJson.version = $version
+        Write-Host "Updating version to: $version"
+        
+        # Write back to package.json
+        $packageJson | ConvertTo-Json -Depth 10 | Set-Content package.json
+        
+        # Verify
+        $updated = Get-Content package.json | ConvertFrom-Json
+        Write-Host "Updated version in package.json: $($updated.version)"
+    
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -112,6 +136,25 @@ jobs:
           Write-Host "⚠ All mirrors failed, electron-builder will try default"
         }
     
+    - name: Clean release folder (remove old builds)
+      shell: pwsh
+      working-directory: ./borekci-pos
+      run: |
+        $releasePath = "release"
+        if (Test-Path $releasePath) {
+          Write-Host "Cleaning release folder: $releasePath"
+          # Remove old .exe, .blockmap, and .yml files but keep the folder structure
+          Get-ChildItem -Path $releasePath -Filter "*.exe" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $releasePath -Filter "*.exe.blockmap" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $releasePath -Filter "*.yml" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+          Write-Host "Release folder cleaned - old files removed"
+          # List remaining files
+          Write-Host "Remaining files:"
+          Get-ChildItem -Path $releasePath -ErrorAction SilentlyContinue | Select-Object Name
+        } else {
+          Write-Host "Release folder does not exist, will be created during build"
+        }
+
     - name: Build application (with retry)
       env:
         ELECTRON_BUILDER_CACHE: ${{ env.ELECTRON_BUILDER_CACHE }}
@@ -258,16 +301,74 @@ jobs:
         echo $body >> $env:GITHUB_OUTPUT
         echo "$delimiter" >> $env:GITHUB_OUTPUT
 
-    - name: Create GitHub Release
+    - name: List all files in release folder (for debugging)
+      shell: pwsh
+      run: |
+        $releasePath = "borekci-pos\release"
+        Write-Host "All files in release folder:"
+        if (Test-Path $releasePath) {
+          Get-ChildItem -Path $releasePath | Select-Object Name, Length, LastWriteTime | Format-Table
+        } else {
+          Write-Host "Release folder not found!"
+        }
+
+    - name: Prepare files list for upload (only current version)
+      id: file_list
+      shell: pwsh
+      run: |
+        $version = "${{ github.ref_name }}".Replace("v", "")
+        $releasePath = "borekci-pos\release"
+        
+        Write-Host "Preparing files for version: $version"
+        
+        # Find files matching current version
+        $exeFile = Get-ChildItem -Path $releasePath -Filter "*.exe" | Where-Object { 
+          $_.Name -like "*$version*" -and $_.Name -like "*Setup*" -and $_.Name -notlike "*uninstaller*"
+        } | Select-Object -First 1
+        
+        $blockmapFile = Get-ChildItem -Path $releasePath -Filter "*.exe.blockmap" | Where-Object { 
+          $_.Name -like "*$version*"
+        } | Select-Object -First 1
+        
+        $latestYml = Join-Path $releasePath "latest.yml"
+        $builderDebugYml = Join-Path $releasePath "builder-debug.yml"
+        
+        # Build file list (relative paths)
+        $fileList = @()
+        if ($exeFile) {
+          $fileList += $exeFile.FullName
+          Write-Host "Found EXE: $($exeFile.Name)"
+        }
+        if ($blockmapFile) {
+          $fileList += $blockmapFile.FullName
+          Write-Host "Found blockmap: $($blockmapFile.Name)"
+        }
+        if (Test-Path $latestYml) {
+          $fileList += $latestYml
+          Write-Host "Found latest.yml"
+        }
+        if (Test-Path $builderDebugYml) {
+          $fileList += $builderDebugYml
+          Write-Host "Found builder-debug.yml"
+        }
+        
+        if ($fileList.Count -eq 0) {
+          Write-Host "ERROR: No files found for version $version"
+          exit 1
+        }
+        
+        # Write to output as newline-separated list
+        $fileListString = $fileList -join "`n"
+        echo "files=$fileListString" >> $env:GITHUB_OUTPUT
+        Write-Host "Total files to upload: $($fileList.Count)"
+
+    - name: Create GitHub Release with version-specific files only
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
         name: ${{ steps.notes.outputs.title }}
         body: ${{ steps.notes.outputs.body }}
-        files: |
-          borekci-pos/release/*.exe
-          borekci-pos/release/*.exe.blockmap
-          borekci-pos/release/*.yml
+        files: ${{ steps.file_list.outputs.files }}
         draft: false
         prerelease: false
         generate_release_notes: false

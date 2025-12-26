@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "2.0.9",
+  "version": "2.1.4",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -103,7 +103,7 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
+      "icon": "public/logo.ico",
       "signAndEditExecutable": false,
       "forceCodeSigning": false,
       "requestedExecutionLevel": "asInvoker"
@@ -111,7 +111,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": false,
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
