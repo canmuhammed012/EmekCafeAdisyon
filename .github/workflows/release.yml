@@ -333,23 +333,30 @@ jobs:
         $latestYml = Join-Path $releasePath "latest.yml"
         $builderDebugYml = Join-Path $releasePath "builder-debug.yml"
         
-        # Build file list (relative paths)
+        # Build file list (relative paths with forward slashes for GitHub Actions)
         $fileList = @()
         if ($exeFile) {
-          $fileList += $exeFile.FullName
-          Write-Host "Found EXE: $($exeFile.Name)"
+          # Use GITHUB_WORKSPACE to get relative path
+          $relativePath = $exeFile.FullName.Replace("$env:GITHUB_WORKSPACE\", "").Replace("\", "/")
+          $fileList += $relativePath
+          Write-Host "Found EXE: $($exeFile.Name) -> $relativePath"
         }
         if ($blockmapFile) {
-          $fileList += $blockmapFile.FullName
-          Write-Host "Found blockmap: $($blockmapFile.Name)"
+          $relativePath = $blockmapFile.FullName.Replace("$env:GITHUB_WORKSPACE\", "").Replace("\", "/")
+          $fileList += $relativePath
+          Write-Host "Found blockmap: $($blockmapFile.Name) -> $relativePath"
         }
         if (Test-Path $latestYml) {
-          $fileList += $latestYml
-          Write-Host "Found latest.yml"
+          $fullPath = (Resolve-Path $latestYml).Path
+          $relativePath = $fullPath.Replace("$env:GITHUB_WORKSPACE\", "").Replace("\", "/")
+          $fileList += $relativePath
+          Write-Host "Found latest.yml -> $relativePath"
         }
         if (Test-Path $builderDebugYml) {
-          $fileList += $builderDebugYml
-          Write-Host "Found builder-debug.yml"
+          $fullPath = (Resolve-Path $builderDebugYml).Path
+          $relativePath = $fullPath.Replace("$env:GITHUB_WORKSPACE\", "").Replace("\", "/")
+          $fileList += $relativePath
+          Write-Host "Found builder-debug.yml -> $relativePath"
         }
         
         if ($fileList.Count -eq 0) {
@@ -357,10 +364,14 @@ jobs:
           exit 1
         }
         
-        # Write to output as newline-separated list
-        $fileListString = $fileList -join "`n"
-        echo "files=$fileListString" >> $env:GITHUB_OUTPUT
+        # Write to output as newline-separated list (multiline format)
+        $delimiter = "EOF_$(New-Guid)"
+        echo "files<<$delimiter" >> $env:GITHUB_OUTPUT
+        $fileList | ForEach-Object { echo $_ >> $env:GITHUB_OUTPUT }
+        echo "$delimiter" >> $env:GITHUB_OUTPUT
         Write-Host "Total files to upload: $($fileList.Count)"
+        Write-Host "File list:"
+        $fileList | ForEach-Object { Write-Host "  - $_" }
 
     - name: Create GitHub Release with version-specific files only
       uses: softprops/action-gh-release@v2
