@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SocketProvider } from './contexts/SocketContext';
+import { disconnectSocket } from './services/socket';
 import ProtectedRoute from './components/ProtectedRoute';
 import UpdateNotification from './components/UpdateNotification';
 import PaymentRequestNotification from './components/PaymentRequestNotification';
@@ -63,6 +64,7 @@ function App() {
   }, []);
 
   const handleLogout = useCallback(() => {
+    disconnectSocket();
     setUser(null);
     localStorage.removeItem('user');
   }, []);
@@ -75,39 +77,53 @@ function App() {
     );
   }
 
+  const serverKey = user
+    ? (localStorage.getItem('serverIP') || 'localhost')
+    : 'no-socket';
+
+  const routes = (
+    <>
+      <UpdateNotification />
+      {user && <PaymentRequestNotification user={user} />}
+      {showScreensaver && (
+        <Screensaver onDismiss={() => setShowScreensaver(false)} />
+      )}
+      <Routes>
+        <Route 
+          path="/login" 
+          element={user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />} 
+        />
+        <Route 
+          path="/" 
+          element={user ? <Tables user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/table/:id" 
+          element={user ? <TableDetail user={user} /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/menu/:tableId" 
+          element={user ? <Menu user={user} /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/admin" 
+          element={user?.role === 'yönetici' ? <Admin user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
+        />
+      </Routes>
+    </>
+  );
+
   return (
     <ThemeProvider>
-      <SocketProvider>
-        <Router>
-          <UpdateNotification />
-          <PaymentRequestNotification user={user} />
-          {showScreensaver && (
-            <Screensaver onDismiss={() => setShowScreensaver(false)} />
-          )}
-          <Routes>
-            <Route 
-              path="/login" 
-              element={user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />} 
-            />
-            <Route 
-              path="/" 
-              element={user ? <Tables user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
-            />
-            <Route 
-              path="/table/:id" 
-              element={user ? <TableDetail user={user} /> : <Navigate to="/login" replace />} 
-            />
-            <Route 
-              path="/menu/:tableId" 
-              element={user ? <Menu user={user} /> : <Navigate to="/login" replace />} 
-            />
-            <Route 
-              path="/admin" 
-              element={user?.role === 'yönetici' ? <Admin user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} /> : <Navigate to="/login" replace />} 
-            />
-          </Routes>
-        </Router>
-      </SocketProvider>
+      <Router>
+        {user ? (
+          <SocketProvider key={serverKey}>
+            {routes}
+          </SocketProvider>
+        ) : (
+          routes
+        )}
+      </Router>
     </ThemeProvider>
   );
 }

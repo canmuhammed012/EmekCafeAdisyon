@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld('electron', {
   // App version
   getVersion: () => {
     return ipcRenderer.sendSync('get-version');
-  }
+  },
+
+  getDeviceRole: () => ipcRenderer.invoke('get-device-role'),
+  setDeviceRole: (role) => ipcRenderer.invoke('set-device-role', role),
+
+  listLocalPrinters: () => ipcRenderer.invoke('list-local-printers'),
+  printReceiptLocal: (payload) => ipcRenderer.invoke('print-receipt-local', payload),
 });
 

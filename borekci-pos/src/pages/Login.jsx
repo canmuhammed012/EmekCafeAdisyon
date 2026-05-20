@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { login, getServerInfo } from '../services/api';
+import { login } from '../services/api';
+import { resetSocket } from '../services/socket';
 import Footer from '../components/Footer';
+
+const SERVER_INFO_TIMEOUT = 3000;
+
+async function fetchServerInfo(host) {
+  const base = host ? `http://${host}:3000` : 'http://localhost:3000';
+  const response = await fetch(`${base}/api/server/info`, {
+    method: 'GET',
+    signal: AbortSignal.timeout(SERVER_INFO_TIMEOUT),
+  });
+  if (!response.ok) {
+    throw new Error('Server info alınamadı');
+  }
+  return response.json();
+}
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -10,37 +25,188 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showServerIP, setShowServerIP] = useState(!localStorage.getItem('serverIP'));
+  const [deviceRole, setDeviceRole] = useState(
+    localStorage.getItem('deviceRole') || 'server'
+  );
 
-  // Cihazın kendi IP'sini al
+  // Cihaz rolünü yükle (Electron istemci modu)
   useEffect(() => {
-    const fetchDeviceIP = async () => {
-      try {
-        // Önce localhost'tan dene (admin bilgisayarı)
+    const loadDeviceRole = async () => {
+      if (window.electron?.getDeviceRole) {
         try {
-          const response = await getServerInfo();
-          if (response.data && response.data.ip) {
-            setCurrentDeviceIP(response.data.ip);
-            return;
-          }
-        } catch (err) {
-          // localhost çalışmıyorsa, WebRTC ile local IP'yi al
-          getLocalIP().then(ip => {
-            if (ip) {
-              setCurrentDeviceIP(ip);
-            }
-          });
+          const role = await window.electron.getDeviceRole();
+          setDeviceRole(role);
+          localStorage.setItem('deviceRole', role);
+        } catch (e) {
+          console.log('Cihaz rolü okunamadı:', e);
         }
-      } catch (error) {
-        console.error('IP alınamadı:', error);
       }
     };
-
-    fetchDeviceIP();
+    loadDeviceRole();
   }, []);
 
-  // WebRTC kullanarak local IP'yi al
-  const getLocalIP = () => {
+  const applyDeviceRole = async (role) => {
+    setDeviceRole(role);
+    localStorage.setItem('deviceRole', role);
+    if (window.electron?.setDeviceRole) {
+      await window.electron.setDeviceRole(role);
+    }
+  };
+
+  // Admin sunucusunu bul (birincil sunucu = isPrimaryServer)
+  const resolveAdminServerIP = async () => {
+    if (deviceRole === 'server') {
+      try {
+        const info = await fetchServerInfo(null);
+        if (info.isPrimaryServer) {
+          setCurrentDeviceIP(info.ip);
+          localStorage.removeItem('serverIP');
+          setServerIP('');
+          setShowServerIP(false);
+          return '';
+        }
+        console.log('Localhost birincil sunucu değil, ağda admin aranıyor...');
+      } catch (err) {
+        console.log('Localhost erişilemedi:', err.message);
+      }
+    }
+
+    const savedIP = localStorage.getItem('serverIP');
+    if (savedIP) {
+      try {
+        const info = await fetchServerInfo(savedIP);
+        if (info.isPrimaryServer) {
+          setServerIP(savedIP);
+          setShowServerIP(false);
+          return savedIP;
+        }
+      } catch (e) {
+        console.log('Kaydedilmiş IP birincil sunucu değil:', savedIP);
+      }
+    }
+
+    const foundIP = await findAdminServer();
+    if (foundIP) {
+      setServerIP(foundIP);
+      localStorage.setItem('serverIP', foundIP);
+      setShowServerIP(false);
+      return foundIP;
+    }
+
+    getLocalIP().then((ip) => {
+      if (ip) setCurrentDeviceIP(ip);
+    }).catch(() => {});
+
+    return null;
+  };
+
+  useEffect(() => {
+    resolveAdminServerIP().catch(() => {
+      console.log('Admin sunucu otomatik bulunamadı');
+    });
+  }, [deviceRole]);
+
+  // Network'te admin server'ı otomatik bul (aynı WiFi ağında)
+  const findAdminServer = async () => {
     return new Promise((resolve) => {
+      // Kendi IP'mizi al
+      getLocalIP().then(myIP => {
+        if (!myIP) {
+          resolve(null);
+          return;
+        }
+        
+        // IP'nin subnet'ini bul (örn: 192.168.1.100 -> 192.168.1)
+        const ipParts = myIP.split('.');
+        if (ipParts.length !== 4) {
+          resolve(null);
+          return;
+        }
+        
+        const subnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+        console.log(`🔍 Network taraması başlatılıyor: ${subnet}.x`);
+        
+        // IP test fonksiyonu
+        const testIP = (ip) => {
+          return new Promise((resolveTest) => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 800); // 800ms timeout
+            
+            fetch(`http://${ip}:3000/api/server/info`, {
+              method: 'GET',
+              signal: controller.signal
+            })
+            .then(async (response) => {
+              clearTimeout(timeoutId);
+              if (response.ok) {
+                try {
+                  const data = await response.json();
+                  resolveTest(data.isPrimaryServer ? ip : null);
+                } catch {
+                  resolveTest(null);
+                }
+              } else {
+                resolveTest(null);
+              }
+            })
+            .catch(() => {
+              clearTimeout(timeoutId);
+              resolveTest(null);
+            });
+          });
+        };
+        
+        // Batch'ler halinde tara (her seferinde 20 IP, daha hızlı)
+        const batchSize = 20;
+        let currentBatch = 0;
+        let found = false;
+        
+        const scanBatch = async () => {
+          if (found) return;
+          
+          const start = currentBatch * batchSize + 1;
+          const end = Math.min((currentBatch + 1) * batchSize, 254);
+          
+          const promises = [];
+          for (let i = start; i <= end; i++) {
+            const testIPAddr = `${subnet}.${i}`;
+            // Kendi IP'mizi atla
+            if (testIPAddr === myIP) continue;
+            promises.push(testIP(testIPAddr));
+          }
+          
+          // İlk bulunan IP'yi kullan
+          const results = await Promise.allSettled(promises);
+          for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
+              console.log(`✅ Admin server bulundu: ${result.value}`);
+              found = true;
+              resolve(result.value);
+              return;
+            }
+          }
+          
+          // Sonraki batch'e geç
+          currentBatch++;
+          if (currentBatch * batchSize < 254 && !found) {
+            setTimeout(scanBatch, 50); // 50ms bekle, sonra devam et
+          } else if (!found) {
+            console.log('❌ Admin server bulunamadı');
+            resolve(null);
+          }
+        };
+        
+        // İlk batch'i başlat
+        scanBatch();
+      }).catch(() => {
+        resolve(null);
+      });
+    });
+  };
+
+  // WebRTC kullanarak local IP'yi al (internet gerektirmez, sadece local network)
+  const getLocalIP = () => {
+    return new Promise((resolve, reject) => {
       const RTCPeerConnection = window.RTCPeerConnection || 
                                 window.mozRTCPeerConnection || 
                                 window.webkitRTCPeerConnection;
@@ -50,14 +216,18 @@ const Login = ({ onLogin }) => {
         return;
       }
 
+      // STUN server olmadan da çalışabilir (internet gerektirmez)
+      // Ancak bazı tarayıcılarda STUN olmadan çalışmayabilir, o yüzden boş array kullanıyoruz
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [] // STUN server olmadan - internet gerektirmez
       });
 
       pc.createDataChannel('');
       
+      let resolved = false;
+      
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
+        if (event.candidate && !resolved) {
           const candidate = event.candidate.candidate;
           const match = candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
           if (match && match[1]) {
@@ -66,6 +236,7 @@ const Login = ({ onLogin }) => {
             if (ip.startsWith('192.168.') || 
                 ip.startsWith('10.') || 
                 /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) {
+              resolved = true;
               pc.close();
               resolve(ip);
             }
@@ -73,18 +244,32 @@ const Login = ({ onLogin }) => {
         }
       };
 
+      // Ice gathering tamamlandığında kontrol et
+      pc.onicegatheringstatechange = () => {
+        if (pc.iceGatheringState === 'complete' && !resolved) {
+          // IP bulunamadı, sessizce null döndür
+          pc.close();
+          resolve(null);
+        }
+      };
+
       pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
         .catch(() => {
-          pc.close();
-          resolve(null);
+          if (!resolved) {
+            pc.close();
+            resolve(null);
+          }
         });
 
-      // Timeout
+      // Timeout - 2 saniye yeterli (local network için)
       setTimeout(() => {
-        pc.close();
-        resolve(null);
-      }, 3000);
+        if (!resolved) {
+          resolved = true;
+          pc.close();
+          resolve(null);
+        }
+      }, 2000);
     });
   };
 
@@ -104,22 +289,59 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      // Eğer server IP girilmişse, önce bağlantıyı test et
-      if (serverIP) {
-        try {
-          await getServerInfo();
-        } catch (err) {
-          setError(`Server'a bağlanılamadı: ${serverIP}:3000`);
+      let finalServerIP = serverIP;
+
+      if (!finalServerIP) {
+        setError('Admin sunucu aranıyor, lütfen bekleyin...');
+        const resolved = await resolveAdminServerIP();
+        setError('');
+        if (resolved === '') {
+          finalServerIP = '';
+        } else if (resolved) {
+          finalServerIP = resolved;
+        } else if (deviceRole === 'server') {
+          setError('Admin sunucu bulunamadı. Bu cihaz admin bilgisayarıysa uygulamayı yeniden başlatın.');
+          setLoading(false);
+          return;
+        } else {
+          setError('Admin sunucu bulunamadı. Modem/WiFi ağında olduğunuzdan ve admin PC\'nin açık olduğundan emin olun. IP\'yi manuel girin.');
           setLoading(false);
           return;
         }
       }
 
+      if (finalServerIP) {
+        localStorage.setItem('serverIP', finalServerIP);
+        try {
+          const info = await fetchServerInfo(finalServerIP);
+          if (!info.isPrimaryServer) {
+            setError(`Bu IP birincil (admin) sunucu değil: ${finalServerIP}:3000`);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          setError(`Server'a bağlanılamadı: ${finalServerIP}:3000\nİnternet gerekmez — modem/WiFi üzerinden aynı ağda olun.`);
+          setLoading(false);
+          return;
+        }
+      } else {
+        localStorage.removeItem('serverIP');
+      }
+
+      resetSocket();
+
       const response = await login({ username, password });
       onLogin(response.data);
     } catch (err) {
-      if (err.response?.status === 0 || err.code === 'ERR_NETWORK') {
-        setError(`Server'a bağlanılamadı. IP adresini kontrol edin: ${serverIP || 'localhost'}:3000`);
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError(`Bağlantı zaman aşımına uğradı. İnternet bağlantısı gerekmez, sadece WiFi ağına bağlı olduğunuzdan emin olun.\nServer IP: ${serverIP || 'localhost'}:3000`);
+      } else if (err.response?.status === 0 || err.code === 'ERR_NETWORK') {
+        // Network hatası - belki IP değişti, tekrar dene
+        if (!serverIP) {
+          setError(`Server'a bağlanılamadı. Admin server otomatik bulunamadı.\nLütfen admin bilgisayarının IP adresini manuel olarak girin.`);
+        } else {
+          setError(`Server'a bağlanılamadı. IP adresini kontrol edin: ${serverIP}:3000\nİnternet bağlantısı gerekmez, sadece WiFi ağına bağlı olduğunuzdan emin olun.`);
+        }
       } else {
         setError(err.response?.data?.error || 'Giriş başarısız');
       }
@@ -147,6 +369,32 @@ const Login = ({ onLogin }) => {
             Emek Cafe Adisyon
           </h1>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Bu cihaz hangi rolde?</p>
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="radio"
+                  name="deviceRole"
+                  checked={deviceRole === 'server'}
+                  onChange={() => applyDeviceRole('server')}
+                />
+                Admin / Kasa (sunucu bu cihazda çalışır)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="radio"
+                  name="deviceRole"
+                  checked={deviceRole === 'client'}
+                  onChange={() => applyDeviceRole('client')}
+                />
+                Garson / Tablet (admin bilgisayarına bağlanır)
+              </label>
+              {deviceRole === 'client' && (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  İstemci modu seçildikten sonra uygulamayı bir kez kapatıp açın (yerel sunucu kapanır).
+                </p>
+              )}
+            </div>
             {/* Cihazın Kendi IP'si */}
             {currentDeviceIP && (
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">

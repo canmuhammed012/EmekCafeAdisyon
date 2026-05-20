@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "2.1.6",
+  "version": "2.2.1",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -34,7 +34,7 @@
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",
     "express": "^5.1.0",
-    "node-printer": "^1.0.4",
+    "iconv-lite": "^0.7.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.5",
@@ -69,13 +69,15 @@
     "asarUnpack": [
       "**/node_modules/sqlite3/**/*",
       "**/node_modules/usb/**/*",
-      "**/node_modules/escpos-usb/**/*",
-      "**/node_modules/node-printer/**/*"
+      "**/node_modules/escpos-usb/**/*"
     ],
     "files": [
       "dist/**/*",
       "electron/**/*",
       "server.js",
+      "windows-raw-print.js",
+      "print-receipt-route.js",
+      "print-raw.ps1",
       "package.json",
       "node_modules/**/*",
       "public/**/*"
@@ -92,6 +94,18 @@
       {
         "from": "server.js",
         "to": "server.js"
+      },
+      {
+        "from": "windows-raw-print.js",
+        "to": "windows-raw-print.js"
+      },
+      {
+        "from": "print-receipt-route.js",
+        "to": "print-receipt-route.js"
+      },
+      {
+        "from": "print-raw.ps1",
+        "to": "print-raw.ps1"
       }
     ],
     "win": {

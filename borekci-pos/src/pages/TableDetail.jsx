@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, printReceipt, requestTablePayment } from '../services/api';
+import { getOrders, updateOrder, deleteOrder, createPayment, getCategories, getProducts, createOrder, transferOrders, getTables, requestTablePayment } from '../services/api';
+import { printTableReceipt } from '../services/print';
 import { getExchangeRates, convertWithDiscount } from '../services/currency';
 import { broadcastUpdate, onUpdate, UPDATE_TYPES } from '../services/broadcast';
 import { formatTimeTR } from '../utils/dateFormatter';
@@ -335,54 +336,26 @@ const TableDetail = ({ user }) => {
   };
 
   const handlePrintReceipt = async () => {
-    // Önce mevcut yazıcıları listele (debug için)
     try {
-      // API URL'ini doğru şekilde al
-      const serverIP = localStorage.getItem('serverIP');
-      const apiBase = serverIP ? `http://${serverIP}:3000/api` : 'http://localhost:3000/api';
-      const printersResponse = await fetch(`${apiBase}/printers/windows`);
-      const printersData = await printersResponse.json();
-      console.log('📋 Mevcut Windows yazıcıları:', printersData.printers?.map(p => p.name) || []);
-    } catch (e) {
-      console.warn('Yazıcı listesi alınamadı:', e);
+      const result = await printTableReceipt(parseInt(id));
+      const where =
+        result.printedOn === 'local'
+          ? 'bu cihazdaki yazıcıdan'
+          : 'kasa (admin) bilgisayarından';
+      setAlertModal({
+        isOpen: true,
+        title: 'Başarılı',
+        message: `${result.message}\n(${where})`,
+        type: 'success',
+      });
+    } catch (error) {
+      setAlertModal({
+        isOpen: true,
+        title: 'Yazdırma Hatası',
+        message: error.message || 'Fiş yazdırılamadı',
+        type: 'error',
+      });
     }
-    
-    // Öncelikli yazıcı adlarını topla
-    const preferredPrinters = [
-      localStorage.getItem('printerName')?.trim(),
-      localStorage.getItem('printerNameAlt')?.trim(),
-      'POS-80',
-      'XP-80'
-    ].filter(Boolean);
-
-    console.log('🔍 Denenecek yazıcılar:', preferredPrinters);
-    let lastError = null;
-
-    for (const printerName of preferredPrinters) {
-      try {
-        const response = await printReceipt(parseInt(id), printerName, 'windows');
-        if (response.data?.success) {
-          setAlertModal({
-            isOpen: true,
-            title: 'Başarılı',
-            message: response.data.message || `Fiş yazdırıldı (${printerName})`,
-            type: 'success'
-          });
-          return;
-        }
-        lastError = response.data?.error || 'Fiş yazdırılamadı';
-      } catch (error) {
-        console.error(`Fiş yazdırma hatası (${printerName}):`, error);
-        lastError = error.response?.data?.error || error.message;
-      }
-    }
-
-    setAlertModal({
-      isOpen: true,
-      title: 'Hata',
-      message: lastError || 'Fiş yazdırılamadı',
-      type: 'error'
-    });
   };
 
   // Masa değiştirme fonksiyonu
@@ -502,7 +475,7 @@ const TableDetail = ({ user }) => {
         {/* Menu Section */}
         <div className="flex flex-col lg:flex-row gap-2 sm:gap-4 px-2 sm:px-4 h-full overflow-hidden">
           {/* Categories - Sol tarafta, küçük ekranlarda üstte */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.4rem, 0.8vw, 0.8rem)', minWidth: 'clamp(180px, 18vw, 250px)', maxWidth: '250px', height: '100%' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 overflow-hidden flex flex-col" style={{ padding: 'clamp(0.4rem, 0.8vw, 0.8rem)', minWidth: 'clamp(120px, 12vw, 200px)', maxWidth: 'clamp(120px, 12vw, 200px)', width: 'clamp(120px, 12vw, 200px)', height: '100%' }}>
             <h2 className="font-bold mb-1 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.9rem, 1.3vw, 1.3rem)' }}>Kategoriler</h2>
             <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-hidden pb-2 lg:pb-0 -mx-2 lg:mx-0 px-2 lg:px-0 flex-1 min-h-0" style={{ gap: 'clamp(0.4rem, 0.6vw, 0.7rem)' }}>
               {categories.map((category) => {
@@ -565,8 +538,8 @@ const TableDetail = ({ user }) => {
 
                  {/* Orta ve Sağ taraf - Ürünler ve Siparişler */}
                  <div className="flex-1 flex flex-col lg:flex-row gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ height: '100%' }}>
-                   {/* Orta - Header ve Ürünler - %20 daraltıldı */}
-                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ flexBasis: 'auto', minWidth: 0, maxWidth: '80%', height: '100%' }}>
+                   {/* Orta - Header ve Ürünler */}
+                   <div className="flex-1 flex flex-col gap-2 sm:gap-4 min-w-0 overflow-hidden" style={{ flexBasis: 'auto', minWidth: 'clamp(200px, 20vw, 400px)', maxWidth: '100%', height: '100%' }}>
                      {/* Header */}
                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-2 sm:p-3 md:p-4 flex flex-col gap-2 sm:gap-3 flex-shrink-0">
                        {/* Üst satır: Başlık ve Masa Değiştir */}
@@ -591,7 +564,7 @@ const TableDetail = ({ user }) => {
                        {/* Alt satır: Butonlar ve Fiyat/Kur bilgileri */}
                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 w-full">
                          {/* Butonlar */}
-                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto flex-shrink-0">
                            {orders.length > 0 && (
                              <>
                                <button
@@ -653,7 +626,7 @@ const TableDetail = ({ user }) => {
                          </div>
                          
                          {/* Fiyat ve Kur bilgileri */}
-                         <div className="text-right w-full sm:w-auto sm:ml-auto min-w-[140px] sm:min-w-[160px] flex-shrink-0">
+                         <div className="text-right w-full sm:w-auto sm:ml-auto min-w-[120px] sm:min-w-[140px] flex-shrink-0">
                            <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
                              {total.toFixed(2)} ₺
                            </p>
@@ -837,7 +810,7 @@ const TableDetail = ({ user }) => {
             </div>
 
             {/* Sağ taraf - Siparişler (Dikey Liste) - Sabit genişlik, itmesin */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(210px, 21vw, 280px)', maxWidth: '280px', height: '100%' }}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md w-full lg:w-auto lg:flex-shrink-0 flex flex-col overflow-hidden" style={{ padding: 'clamp(0.5rem, 1vw, 1rem)', minWidth: 'clamp(150px, 15vw, 240px)', maxWidth: 'clamp(150px, 15vw, 240px)', width: 'clamp(150px, 15vw, 240px)', height: '100%' }}>
               <h2 className="font-bold mb-2 text-gray-800 dark:text-white flex-shrink-0" style={{ fontSize: 'clamp(0.95rem, 1.3vw, 1.25rem)' }}>Siparişler</h2>
               {orders.length === 0 ? (
                 <p className="text-center text-gray-600 dark:text-gray-400" style={{ padding: 'clamp(1rem, 2vw, 1.5rem)', fontSize: 'clamp(0.75rem, 1vw, 0.875rem)' }}>

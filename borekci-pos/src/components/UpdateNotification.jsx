@@ -30,6 +30,24 @@ const UpdateNotification = () => {
 
     const handleUpdateDownloaded = (event, version) => {
       console.log('✅ AUTO-UPDATER: Güncelleme indirildi!', version);
+      
+      // Versiyon kontrolü - mevcut versiyonla karşılaştır
+      const currentVersion = window.electron?.getVersion?.() || '';
+      const downloadedVersion = (version || '').replace(/^v/i, '').trim();
+      const currentVersionClean = currentVersion.replace(/^v/i, '').trim();
+      
+      console.log('🔍 Versiyon karşılaştırması (UpdateNotification):');
+      console.log('   Mevcut:', currentVersionClean);
+      console.log('   İndirilen:', downloadedVersion);
+      
+      // Eğer versiyonlar aynıysa, kurulumu atla
+      if (currentVersionClean === downloadedVersion) {
+        console.log('⚠️ İndirilen versiyon mevcut versiyonla aynı! Kurulum atlanıyor...');
+        setUpdateInfo(null); // Bildirimi kapat
+        setDownloadProgress(null);
+        return;
+      }
+      
       setUpdateInfo({ status: 'downloaded', version });
       setDownloadProgress(null);
     };

@@ -8,7 +8,7 @@ const os = require('os');
 const escpos = require('escpos');
 const escposUSB = require('escpos-usb');
 const usb = require('usb');
-const printer = require('node-printer');
+const winRawPrint = require('./windows-raw-print');
 
 const app = express();
 const server = http.createServer(app);
@@ -223,6 +223,7 @@ db.serialize(() => {
 
   // Varsayılan ayarları ekle
   db.run(`INSERT OR IGNORE INTO settings(key, value) VALUES('printerIP', '')`);
+  db.run(`INSERT OR IGNORE INTO settings(key, value) VALUES('printerName', '')`);
   db.run(`INSERT OR IGNORE INTO settings(key, value) VALUES('taxRate', '0')`);
   db.run(`INSERT OR IGNORE INTO settings(key, value) VALUES('restaurantName', 'Emek Cafe Adisyon')`);
   
@@ -1205,620 +1206,53 @@ app.get('/api/printers', (req, res) => {
   }
 });
 
-// Test endpoint - route'un çalışıp çalışmadığını kontrol et
-app.get('/api/print/test', (req, res) => {
-  console.log('✅ /api/print/test endpoint çalışıyor');
-  res.json({ success: true, message: 'Print endpoint çalışıyor' });
-});
-
-// Windows yazıcılarını listele (PowerShell öncelikli)
+// Windows yazıcılarını listele
 app.get('/api/printers/windows', (req, res) => {
   try {
-    console.log('🔍 Windows yazıcıları aranıyor...');
-    const { execSync } = require('child_process');
-    let printers = [];
-    
-    // Önce PowerShell komutunu dene
-    try {
-      console.log('🔍 PowerShell komutu çalıştırılıyor...');
-      const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
-        encoding: 'utf-8',
-        timeout: 5000,
-        shell: true
-      });
-      
-      const psLines = psOutput.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && line.length > 0);
-      
-      printers = psLines.map((name, index) => ({
-        name: name,
-        isDefault: index === 0,
-        status: 'ready'
-      }));
-      
-      console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
-    } catch (psError) {
-      console.error('❌ PowerShell komutu başarısız:', psError.message);
-      
-      // Fallback: wmic komutunu dene
-      try {
-        console.log('🔄 wmic komutu deneniyor...');
-        const output = execSync('wmic printer get name', { 
-          encoding: 'utf-8',
-          timeout: 5000,
-          shell: true
-        });
-        
-        const lines = output.split('\n')
-          .map(line => line.trim())
-          .filter(line => line && line !== 'Name' && line.length > 0);
-        
-        printers = lines.map((name, index) => ({
-          name: name,
-          isDefault: index === 0,
-          status: 'ready'
-        }));
-        
-        console.log('✅ wmic ile yazıcılar bulundu:', printers.length);
-      } catch (wmicError) {
-        console.error('❌ wmic komutu da başarısız:', wmicError.message);
-        throw new Error('Yazıcı listesi alınamadı. PowerShell ve wmic komutları başarısız oldu.');
-      }
+    if (process.platform !== 'win32') {
+      return res.json({ printers: [] });
     }
-    
-    console.log('📋 Bulunan Windows yazıcıları:', printers.length);
-    
-    const printerList = printers.map((printerItem, index) => ({
-      id: index,
-      name: printerItem.name || printerItem,
-      status: printerItem.status || 'ready',
-      isDefault: printerItem.isDefault || index === 0,
-      type: 'windows'
-    }));
-    
-    res.json({ printers: printerList });
+    const printers = winRawPrint.listWindowsPrinters();
+    res.json({ printers });
   } catch (error) {
     console.error('Windows yazıcı listesi alınamadı:', error);
     res.status(500).json({ error: 'Yazıcı listesi alınamadı: ' + error.message });
   }
 });
 
-// Windows yazıcıya fiş yazdır (node-printer kullanarak)
-// USB yazıcı desteği eklendi - önce USB denenir, başarısız olursa Windows yazıcıya fallback yapılır
-app.post('/api/print/receipt', (req, res) => {
-  console.log('📝 /api/print/receipt endpoint çağrıldı');
-  console.log('📦 Request body:', req.body);
-  const { tableId, printerName, printerIndex, printerType = 'auto' } = req.body;
-  
-  if (!tableId) {
-    res.status(400).json({ error: 'Masa ID gerekli' });
-    return;
-  }
-  
-  // Fiş verilerini al
-  db.get(`SELECT * FROM tables WHERE id = ?`, [tableId], (err, table) => {
-    if (err || !table) {
-      res.status(400).json({ error: 'Masa bulunamadı' });
-      return;
-    }
-    
-    db.all(`SELECT orders.id, products.name, products.price, orders.quantity, orders.total 
-            FROM orders 
-            JOIN products ON orders.productId = products.id 
-            WHERE orders.tableId = ? 
-            ORDER BY orders.createdAt`, [tableId], (err, orders) => {
-      if (err) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      
-      if (!orders || orders.length === 0) {
-        res.status(400).json({ error: 'Bu masada sipariş bulunamadı' });
-        return;
-      }
-      
-      db.get(`SELECT value as restaurantName FROM settings WHERE key = 'restaurantName'`, (err, setting) => {
-        const restaurantName = setting?.value || 'Emek Cafe Adisyon';
-        
-        // Fiş içeriğini ESC/POS formatında oluştur (hem USB hem Windows için aynı)
-        let receiptContent = '\x1B\x40'; // Initialize printer
-        receiptContent += '\x1B\x61\x01'; // Center align
-        receiptContent += '\x1B\x21\x30'; // Double height and width
-        receiptContent += `${restaurantName}\n`;
-        receiptContent += '\x1B\x21\x00'; // Normal text
-        receiptContent += '\x1B\x61\x00'; // Left align
-        receiptContent += '--------------------------------\n';
-        receiptContent += `Masa: ${table.name}\n`;
-        receiptContent += `Tarih: ${new Date().toLocaleString('tr-TR')}\n`;
-        receiptContent += '--------------------------------\n';
-        
-        // Siparişleri yazdır
-        orders.forEach((order) => {
-          const line = `${order.name} x${order.quantity}`;
-          const price = `${order.total.toFixed(2)} ₺`;
-          const spaces = 32 - line.length - price.length;
-          receiptContent += `${line}${' '.repeat(Math.max(0, spaces))}${price}\n`;
-        });
-        
-        receiptContent += '--------------------------------\n';
-        receiptContent += '\x1B\x61\x02'; // Right align
-        receiptContent += `TOPLAM: ${table.total.toFixed(2)} ₺\n`;
-        receiptContent += '\x1B\x61\x00'; // Left align
-        receiptContent += '\n\n';
-        receiptContent += '--------------------------------\n';
-        receiptContent += '\x1B\x61\x01'; // Center align
-        receiptContent += 'Nişanca Mahallesi Türkeli Caddesi,\n';
-        receiptContent += 'Kumkapı 70/B, 34130 Fatih/İstanbul\n';
-        receiptContent += '\n';
-        receiptContent += '(0212) 516 54 86\n';
-        receiptContent += '\n';
-        receiptContent += 'Bizi tercih ettiğiniz için\n';
-        receiptContent += 'teşekkür ederiz!\n';
-        receiptContent += '\n\n\n';
-        receiptContent += '\x1D\x56\x00'; // Cut paper
-        
-        // USB yazıcıyı dene (printerType === 'usb' veya 'auto' ise)
-        if (printerType === 'usb' || printerType === 'auto') {
-          console.log('🔌 USB yazıcı deneniyor...');
-          try {
-            // USB yazıcıları bul
-            let usbDevices = [];
-            if (typeof escposUSB.find === 'function') {
-              usbDevices = escposUSB.find();
-            } else if (escposUSB.device && typeof escposUSB.device.find === 'function') {
-              usbDevices = escposUSB.device.find();
-            } else {
-              // usb paketi ile manuel arama
-              const allDevices = usb.getDeviceList();
-              // ESC/POS yazıcıları için yaygın vendor ID'leri filtrele
-              const commonVendorIds = [0x04f9, 0x0483, 0x1504, 0x154f, 0x04e8];
-              usbDevices = allDevices.filter(device => {
-                const descriptor = device.deviceDescriptor;
-                return commonVendorIds.includes(descriptor.idVendor);
-              });
-            }
-            
-            if (usbDevices && usbDevices.length > 0) {
-              // Yazıcı seçimi
-              let selectedUSBDevice = null;
-              if (typeof printerIndex === 'number' && printerIndex >= 0 && printerIndex < usbDevices.length) {
-                selectedUSBDevice = usbDevices[printerIndex];
-              } else {
-                selectedUSBDevice = usbDevices[0]; // İlk USB yazıcıyı kullan
-              }
-              
-              if (selectedUSBDevice) {
-                console.log('🖨️ USB yazıcı seçildi, doğrudan yazdırılıyor...');
-                
-                // escpos-usb ile doğrudan yazdır
-                try {
-                  // escpos-usb API'sini kullan
-                  let device;
-                  if (typeof escposUSB.USB === 'function') {
-                    device = escposUSB.USB(selectedUSBDevice);
-                  } else if (escposUSB.device && typeof escposUSB.device.USB === 'function') {
-                    device = escposUSB.device.USB(selectedUSBDevice);
-                  } else {
-                    // Direkt USB cihazını kullan
-                    device = selectedUSBDevice;
-                  }
-                  
-                  const options = { encoding: "GB18030" /* default */ };
-                  const printer = new escpos.Printer(device, options);
-                  
-                  device.open((error) => {
-                    if (error) {
-                      console.error('❌ USB yazıcı açılamadı:', error);
-                      // USB başarısız, Windows yazıcıya fallback yap
-                      printToWindowsPrinter();
-                    } else {
-                      console.log('✅ USB yazıcı açıldı, yazdırılıyor...');
-                      
-                      // ESC/POS komutlarını doğrudan gönder (Buffer olarak)
-                      const buffer = Buffer.from(receiptContent, 'utf8');
-                      
-                      // escpos-usb device.write() kullan
-                      if (typeof device.write === 'function') {
-                        device.write(buffer, (writeError) => {
-                          if (writeError) {
-                            console.error('❌ USB yazıcıya yazma hatası:', writeError);
-                            try { device.close(); } catch(e) {}
-                            // USB başarısız, Windows yazıcıya fallback yap
-                            printToWindowsPrinter();
-                          } else {
-                            console.log('✅ USB yazıcıya başarıyla yazıldı');
-                            try { device.close(); } catch(e) {}
-                            res.json({ success: true, message: 'Fiş USB yazıcıya başarıyla yazdırıldı', printerType: 'usb' });
-                          }
-                        });
-                      } else {
-                        // Alternatif: escpos Printer API kullan
-                        try {
-                          printer.text(receiptContent);
-                          printer.cut();
-                          printer.close();
-                          console.log('✅ USB yazıcıya başarıyla yazıldı (Printer API)');
-                          res.json({ success: true, message: 'Fiş USB yazıcıya başarıyla yazdırıldı', printerType: 'usb' });
-                        } catch (printerError) {
-                          console.error('❌ Printer API hatası:', printerError);
-                          try { device.close(); } catch(e) {}
-                          printToWindowsPrinter();
-                        }
-                      }
-                    }
-                  });
-                  
-                  return; // USB yazdırma başlatıldı, fonksiyondan çık
-                } catch (usbError) {
-                  console.error('❌ USB yazıcı hatası:', usbError);
-                  // USB başarısız, Windows yazıcıya fallback yap
-                  printToWindowsPrinter();
-                }
-              } else {
-                console.warn('⚠️ USB yazıcı seçilemedi, Windows yazıcıya geçiliyor...');
-                printToWindowsPrinter();
-              }
-            } else {
-              console.warn('⚠️ USB yazıcı bulunamadı, Windows yazıcıya geçiliyor...');
-              printToWindowsPrinter();
-            }
-          } catch (usbFindError) {
-            console.error('❌ USB yazıcı arama hatası:', usbFindError);
-            // USB başarısız, Windows yazıcıya fallback yap
-            printToWindowsPrinter();
-          }
-        } else {
-          // Direkt Windows yazıcıya git
-          printToWindowsPrinter();
-        }
-        
-        // Windows yazıcıya yazdırma fonksiyonu
-        function printToWindowsPrinter() {
-          try {
-          // Windows yazıcılarını bul
-          console.log('🔍 Windows yazıcıları aranıyor...');
-          console.log('📦 printer objesi:', typeof printer, Object.keys(printer || {}));
-          
-          // Windows API kullanarak yazıcıları bul (PowerShell öncelikli, wmic fallback)
-          let printers = [];
-          const { execSync } = require('child_process');
-          
-          // Önce PowerShell komutunu dene (daha güvenilir)
-          try {
-            console.log('🔍 PowerShell komutu çalıştırılıyor...');
-            const psOutput = execSync('powershell -Command "Get-Printer | Select-Object -ExpandProperty Name"', {
-              encoding: 'utf-8',
-              timeout: 5000,
-              shell: true
-            });
-            
-            console.log('📋 PowerShell çıktısı:', psOutput);
-            
-            const psLines = psOutput.split('\n')
-              .map(line => line.trim())
-              .filter(line => line && line.length > 0);
-            
-            console.log('📋 Bulunan yazıcı satırları:', psLines);
-            
-            printers = psLines.map((name, index) => ({
-              name: name,
-              isDefault: index === 0,
-              status: 'ready'
-            }));
-            
-            console.log('✅ PowerShell ile yazıcılar bulundu:', printers.length);
-            printers.forEach((p, i) => {
-              console.log(`  ${i + 1}. ${p.name} (default: ${p.isDefault})`);
-            });
-          } catch (psError) {
-            console.error('❌ PowerShell komutu başarısız:', psError.message);
-            
-            // Fallback: wmic komutunu dene
-            try {
-              console.log('🔄 wmic komutu deneniyor...');
-              const output = execSync('wmic printer get name', { 
-                encoding: 'utf-8',
-                timeout: 5000,
-                shell: true
-              });
-              
-              console.log('📋 wmic çıktısı:', output);
-              
-              const lines = output.split('\n')
-                .map(line => line.trim())
-                .filter(line => line && line !== 'Name' && line.length > 0);
-              
-              console.log('📋 Bulunan yazıcı satırları:', lines);
-              
-              printers = lines.map((name, index) => ({
-                name: name,
-                isDefault: index === 0,
-                status: 'ready'
-              }));
-              
-              console.log('✅ wmic ile yazıcılar bulundu:', printers.length);
-              printers.forEach((p, i) => {
-                console.log(`  ${i + 1}. ${p.name} (default: ${p.isDefault})`);
-              });
-            } catch (wmicError) {
-              console.error('❌ wmic komutu da başarısız:', wmicError.message);
-              
-              // Son çare: Windows registry'den yazıcıları oku
-              try {
-                console.log('🔄 Registry\'den yazıcılar okunuyor...');
-                const regPath = 'HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Devices';
-                const regOutput = execSync(`reg query "${regPath}" /s`, {
-                  encoding: 'utf-8',
-                  timeout: 5000,
-                  shell: true
-                });
-                
-                // Registry çıktısını parse et
-                const regLines = regOutput.split('\n')
-                  .filter(line => line.includes('REG_SZ'))
-                  .map(line => {
-                    const match = line.match(/REG_SZ\s+(.+)/);
-                    return match ? match[1].trim() : null;
-                  })
-                  .filter(name => name && name.length > 0);
-                
-                printers = regLines.map((name, index) => ({
-                  name: name,
-                  isDefault: index === 0,
-                  status: 'ready'
-                }));
-                
-                console.log('✅ Registry ile yazıcılar bulundu:', printers.length);
-              } catch (regError) {
-                console.error('❌ Registry okuma da başarısız:', regError.message);
-                throw new Error('Yazıcı listesi alınamadı. PowerShell, wmic ve registry yöntemleri başarısız oldu.');
-              }
-            }
-          }
-          
-          console.log('📋 Bulunan yazıcılar:', printers.length);
-          
-          if (!printers || printers.length === 0) {
-            console.error('❌ Windows yazıcı bulunamadı');
-            res.status(404).json({ error: 'Windows yazıcı bulunamadı. Lütfen yazıcınızın yüklü olduğundan emin olun.' });
-            return;
-          }
-          
-          // Yazıcı seçimi
-          let selectedPrinter;
-          if (typeof printerIndex === 'number' && printerIndex >= 0 && printerIndex < printers.length) {
-            // Index ile yazıcı seç
-            selectedPrinter = printers[printerIndex];
-            console.log('📌 Index ile yazıcı seçildi:', selectedPrinter.name);
-          } else if (printerName) {
-            // Belirtilen yazıcıyı bul (daha esnek eşleştirme)
-            const normalizedPrinterName = printerName.toLowerCase().trim();
-            selectedPrinter = printers.find(p => {
-              const normalizedPName = p.name.toLowerCase().trim();
-              // Tam eşleşme
-              if (normalizedPName === normalizedPrinterName) return true;
-              // İçeriyor mu kontrol et
-              if (normalizedPName.includes(normalizedPrinterName)) return true;
-              if (normalizedPrinterName.includes(normalizedPName)) return true;
-              // Tire, boşluk, parantez gibi karakterleri yok sayarak eşleştir
-              const cleanPName = normalizedPName.replace(/[-\s()]/g, '');
-              const cleanPrinterName = normalizedPrinterName.replace(/[-\s()]/g, '');
-              if (cleanPName === cleanPrinterName) return true;
-              if (cleanPName.includes(cleanPrinterName)) return true;
-              if (cleanPrinterName.includes(cleanPName)) return true;
-              return false;
-            });
-            
-            if (!selectedPrinter) {
-              console.error('❌ Belirtilen yazıcı bulunamadı:', printerName);
-              console.log('📋 Mevcut yazıcılar:', printers.map(p => p.name));
-              res.status(404).json({ 
-                error: `Yazıcı bulunamadı: ${printerName}`,
-                availablePrinters: printers.map(p => p.name)
-              });
-              return;
-            } else {
-              console.log('✅ Yazıcı bulundu:', selectedPrinter.name, '(aranan:', printerName + ')');
-            }
-          } else {
-            // POS-80 veya benzeri yazıcıları öncelikle ara
-            selectedPrinter = printers.find(p => 
-              p.name.toLowerCase().includes('pos') || 
-              p.name.toLowerCase().includes('80') ||
-              p.name.toLowerCase().includes('q900')
-            );
-            
-            // Bulunamazsa varsayılan yazıcıyı veya ilk yazıcıyı kullan
-            if (!selectedPrinter) {
-              selectedPrinter = printers.find(p => p.isDefault) || printers[0];
-            }
-          }
-          
-          if (!selectedPrinter) {
-            console.error('❌ Hiç yazıcı bulunamadı');
-            res.status(404).json({ error: 'Hiç yazıcı bulunamadı. Lütfen yazıcınızın yüklü olduğundan emin olun.' });
-            return;
-          }
-          
-          console.log('🖨️ Seçilen yazıcı:', selectedPrinter.name);
-          
-          // Windows yazıcıya yazdır (receiptContent zaten yukarıda oluşturuldu)
-          console.log('✅ Yazıcıya yazdırılıyor:', selectedPrinter.name);
-          
-          // Önce yazıcının gerçekten var olup olmadığını kontrol et (esnek kontrol)
-          try {
-            const { execSync } = require('child_process');
-            console.log('🔍 Yazıcı durumu kontrol ediliyor:', selectedPrinter.name);
-            
-            // Yazıcı adındaki özel karakterleri escape et
-            const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''").replace(/"/g, '""');
-            
-            // Önce tam ad ile kontrol et
-            try {
-              const checkOutput = execSync(`powershell -Command "Get-Printer -Name '${escapedPrinterName}' -ErrorAction Stop | Select-Object Name, PrinterStatus"`, {
-                encoding: 'utf-8',
-                timeout: 3000,
-                shell: true
-              });
-              console.log('✅ Yazıcı bulundu ve hazır:', checkOutput);
-            } catch (exactError) {
-              // Tam ad ile bulunamazsa, partial match ile dene
-              console.log('⚠️ Tam ad ile bulunamadı, partial match deneniyor...');
-              try {
-                const allPrinters = execSync(`powershell -Command "Get-Printer | Where-Object { $_.Name -like '*${escapedPrinterName}*' -or '${escapedPrinterName}' -like \"*$($_.Name)*\" } | Select-Object Name, PrinterStatus"`, {
-                  encoding: 'utf-8',
-                  timeout: 3000,
-                  shell: true
-                });
-                
-                if (allPrinters && allPrinters.trim().length > 0) {
-                  console.log('✅ Yazıcı partial match ile bulundu:', allPrinters);
-                  // Yazıcı adını güncelle
-                  const match = allPrinters.match(/Name\s*:\s*([^\r\n]+)/);
-                  if (match) {
-                    selectedPrinter.name = match[1].trim();
-                    console.log('🔄 Yazıcı adı güncellendi:', selectedPrinter.name);
-                  }
-                } else {
-                  throw new Error('Yazıcı bulunamadı');
-                }
-              } catch (partialError) {
-                console.error('❌ Yazıcı kontrolü başarısız (tam ve partial match):', partialError.message);
-                // Yazıcı kontrolünü atla, direkt yazdırmayı dene (yazıcı Windows'ta görünüyorsa çalışabilir)
-                console.warn('⚠️ Yazıcı kontrolü atlanıyor, direkt yazdırma deneniyor...');
-              }
-            }
-          } catch (checkError) {
-            console.error('❌ Yazıcı kontrolü genel hatası:', checkError.message);
-            // Yazıcı kontrolünü atla, direkt yazdırmayı dene
-            console.warn('⚠️ Yazıcı kontrolü atlanıyor, direkt yazdırma deneniyor...');
-          }
-          
-          // node-printer API'sini kontrol et ve yazdır
-          if (typeof printer.printDirect === 'function') {
-            printer.printDirect({
-              data: receiptContent,
-              printer: selectedPrinter.name,
-              type: 'RAW',
-              success: (jobID) => {
-                console.log('✅ Yazdırma işi başlatıldı, Job ID:', jobID);
-                res.json({ success: true, message: 'Fiş başarıyla yazdırıldı', jobID });
-              },
-              error: (error) => {
-                console.error('❌ Yazdırma hatası:', error);
-                res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
-              }
-            });
-          } else {
-            // Alternatif: Windows print komutu kullan
-            try {
-              const fs = require('fs');
-              const path = require('path');
-              const { execSync } = require('child_process');
-              
-              // Geçici dosya oluştur
-              const tempFile = path.join(os.tmpdir(), `receipt_${Date.now()}.txt`);
-              fs.writeFileSync(tempFile, receiptContent, 'utf8');
-              
-              console.log('📄 Geçici dosya oluşturuldu:', tempFile);
-              
-              // Windows print komutu ile yazdır (stderr'ı da kontrol et)
-              let printResult = '';
-              try {
-                printResult = execSync(`print /D:"${selectedPrinter.name}" "${tempFile}"`, { 
-                  encoding: 'utf-8',
-                  timeout: 10000,
-                  shell: true,
-                  stdio: ['pipe', 'pipe', 'pipe'] // stdin, stdout, stderr
-                });
-                console.log('📋 Print komutu çıktısı:', printResult);
-              } catch (execError) {
-                const printErrorMsg = execError.message || execError.toString();
-                console.error('❌ Print komutu hatası:', printErrorMsg);
-                
-                // Geçici dosyayı temizle
-                try {
-                  if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                  }
-                } catch (e) {}
-                
-                res.status(500).json({ error: 'Yazdırma hatası: ' + printErrorMsg });
-                return;
-              }
-              
-              // Print komutunun çıktısını kontrol et
-              if (printResult && (printResult.toLowerCase().includes('error') || printResult.toLowerCase().includes('cannot'))) {
-                console.error('❌ Print komutu hata mesajı içeriyor:', printResult);
-                // Geçici dosyayı temizle
-                try {
-                  if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                  }
-                } catch (e) {}
-                res.status(500).json({ error: 'Yazdırma başarısız: ' + printResult });
-                return;
-              }
-              
-              // Yazıcı kuyruğunu kontrol et (yazdırma işinin gerçekten eklendiğini doğrula)
-              try {
-                const escapedPrinterName = selectedPrinter.name.replace(/'/g, "''");
-                const queueCheck = execSync(`powershell -Command "Get-PrintJob -PrinterName '${escapedPrinterName}' -ErrorAction SilentlyContinue | Select-Object -First 1"`, {
-                  encoding: 'utf-8',
-                  timeout: 2000,
-                  shell: true
-                });
-                if (queueCheck && queueCheck.trim().length > 0) {
-                  console.log('✅ Yazdırma işi kuyruğa eklendi');
-                } else {
-                  console.warn('⚠️ Yazdırma kuyruğu boş (yazıcı yok veya hazır değil olabilir)');
-                }
-              } catch (queueError) {
-                console.warn('⚠️ Yazdırma kuyruğu kontrol edilemedi:', queueError.message);
-                // Bu bir hata değil, sadece uyarı
-              }
-              
-              // Geçici dosyayı sil
-              setTimeout(() => {
-                try {
-                  if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                    console.log('🗑️ Geçici dosya silindi');
-                  }
-                } catch (e) {
-                  console.warn('⚠️ Geçici dosya silinemedi:', e.message);
-                }
-              }, 2000);
-              
-              console.log('✅ Yazdırma işi başlatıldı');
-              res.json({ success: true, message: 'Fiş başarıyla yazdırıldı' });
-            } catch (printError) {
-              console.error('❌ Yazdırma hatası:', printError);
-              // Geçici dosyayı temizle
-              try {
-                const fs = require('fs');
-                const path = require('path');
-                const files = fs.readdirSync(os.tmpdir());
-                const receiptFiles = files.filter(f => f.startsWith('receipt_') && f.endsWith('.txt'));
-                receiptFiles.forEach(file => {
-                  try {
-                    fs.unlinkSync(path.join(os.tmpdir(), file));
-                  } catch (e) {}
-                });
-              } catch (e) {}
-              res.status(500).json({ error: 'Yazdırma hatası: ' + printError.message });
-            }
-          }
-        } catch (error) {
-          console.error('❌ Genel yazdırma hatası:', error);
-          res.status(500).json({ error: 'Yazdırma hatası: ' + error.message });
-        }
-        } // printToWindowsPrinter fonksiyonu sonu
-      });
-    });
-  });
+app.get('/api/print/test', (req, res) => {
+  res.json({ success: true, message: 'Print API aktif' });
 });
+
+app.post('/api/print/test', (req, res) => {
+  if (process.platform !== 'win32') {
+    return res.status(400).json({ error: 'Test yazdırma yalnızca Windows üzerinde desteklenir' });
+  }
+  try {
+    const printers = winRawPrint.listWindowsPrinters();
+    const selected = winRawPrint.matchPrinter(printers, req.body?.printerName);
+    if (!selected) {
+      return res.status(404).json({
+        error: 'Termal yazıcı bulunamadı',
+        availablePrinters: printers.map((p) => p.name),
+      });
+    }
+    const buffer = winRawPrint.buildEscPosReceipt({
+      restaurantName: 'Emek Cafe Adisyon',
+      tableName: 'TEST',
+      orders: [{ name: 'Test Urun', quantity: 1, total: 1 }],
+      total: 1,
+      date: new Date().toLocaleString('tr-TR'),
+    });
+    winRawPrint.printRawWindows(selected.name, buffer);
+    res.json({ success: true, message: `Test fişi yazdırıldı: ${selected.name}`, printer: selected.name });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const { registerPrintReceiptRoute } = require('./print-receipt-route');
+registerPrintReceiptRoute(app, db, winRawPrint);
 
 // Sunucu bilgilerini getir
 // Health check endpoint - Backend hazır mı kontrolü için
@@ -1830,7 +1264,9 @@ app.get('/api/server/info', (req, res) => {
   res.json({
     ip: networkIP,
     port: port,
-    url: `http://${networkIP}:${port}`
+    url: `http://${networkIP}:${port}`,
+    // Birincil (admin) sunucu — garson yerel backend PRIMARY_SERVER=false ile işaretlenir
+    isPrimaryServer: process.env.PRIMARY_SERVER !== 'false',
   });
 });
 

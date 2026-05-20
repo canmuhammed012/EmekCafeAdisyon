@@ -1,3 +1,5 @@
+v2.2.1 - Fiş yazdırma: yazıcı hangi cihazda takılıysa (garson veya admin) o cihazdan çıktı; yoksa admin sunucusundaki yazıcıya düşer. Garson/admin ağ ve termal yazıcı (XP-90/XP9000) iyileştirmeleri.
+v2.2.0 - Garson/admin ağ bağlantısı düzeltildi (birincil sunucu tespiti, istemci modu), Xprinter termal yazıcı RAW ESC/POS yazdırma (XP-90/XP9000), yazıcı otomatik eşleştirme
 v1.9.19 - Otomatik release başlık/gövde düzeltildi, eski notlar kaldırıldı
 v1.9.18 - Ekran koruyucu fallback ve buton sıraları düzenlendi
 v2.0.3 - Cache temizliği ve ikon/screensaver iyileştirmeleri
@@ -7,4 +9,5 @@ v2.0.6 - Anasayfada bildirim gecikmesi düzeltildi, yazıcı eşleştirmesi iyil
 v2.0.7 - Global bildirim sistemi eklendi (tüm sayfalarda çalışıyor), API endpoint düzeltmeleri, yazıcı debug iyileştirmeleri
 v2.0.8 - Router hatası düzeltildi (useNavigate), Windows icon sorunu düzeltildi (.ico kullanımı)
 v2.0.9 - Windows exe icon embed sorunu düzeltildi (build/icon.ico kullanımı)
-
+v2.1.0 - Otomatik IP bulma eklendi (garson cihazı admin server'ı otomatik bulur), tek instance kontrolü (2 kere açılma sorunu çözüldü), logo her yerde kullanılıyor (masaüstü, setup, görev çubuğu), timeout iyileştirmeleri (internet yavaşladığında takılma sorunu çözüldü), network optimizasyonu (internet olmadan da çalışır - sadece WiFi ağı yeterli)
+v2.1.1 - Auto-updater versiyon kontrolü düzeltildi (aynı versiyon tespit edildiğinde tekrar indirme sorunu çözüldü), GitHub release temizliği (yanlış dosyalar kaldırıldı)

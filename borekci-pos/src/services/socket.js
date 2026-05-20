@@ -3,27 +3,44 @@ import { io } from 'socket.io-client';
 
 let socketInstance = null;
 let isConnecting = false;
+let currentServerUrl = null;
 
 // Backend URL'i belirle
-// Development: localhost:3000
-// Production: Backend'in çalıştığı IP adresi (admin bilgisayarı)
 function getServerUrl() {
-  // localStorage'dan server IP'yi oku
   const serverIP = localStorage.getItem('serverIP');
   if (serverIP) {
     return `http://${serverIP}:3000`;
   }
-  // Varsayılan: localhost (admin bilgisayarı)
   return 'http://localhost:3000';
 }
 
+export function disconnectSocket() {
+  if (socketInstance) {
+    socketInstance.removeAllListeners();
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
+  isConnecting = false;
+  currentServerUrl = null;
+}
+
+/** serverIP değiştiğinde veya giriş sonrası çağrılır */
+export function resetSocket() {
+  disconnectSocket();
+}
+
 export async function getSocket() {
-  // Eğer zaten bağlı bir socket varsa, onu döndür
+  const serverUrl = getServerUrl();
+
+  // Admin IP değiştiyse eski bağlantıyı kapat
+  if (socketInstance && currentServerUrl && currentServerUrl !== serverUrl) {
+    disconnectSocket();
+  }
+
   if (socketInstance && socketInstance.connected) {
     return socketInstance;
   }
 
-  // Eğer bağlanma işlemi devam ediyorsa, bekle
   if (isConnecting) {
     return new Promise((resolve) => {
       const checkInterval = setInterval(() => {
@@ -32,45 +49,38 @@ export async function getSocket() {
           resolve(socketInstance);
         }
       }, 100);
+      setTimeout(() => clearInterval(checkInterval), 30000);
     });
   }
 
   isConnecting = true;
-  const serverUrl = getServerUrl();
-  
+  currentServerUrl = serverUrl;
+
   console.log('📡 Socket bağlantısı başlatılıyor:', serverUrl);
 
   socketInstance = io(serverUrl, {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    reconnectionAttempts: 5,
+    reconnectionDelayMax: 10000,
+    reconnectionAttempts: Infinity,
     timeout: 20000,
   });
 
   socketInstance.on('connect', () => {
-    console.log('✅ Socket bağlandı:', socketInstance.id);
+    console.log('✅ Socket bağlandı:', socketInstance.id, '→', serverUrl);
     isConnecting = false;
   });
 
   socketInstance.on('disconnect', (reason) => {
-    console.log('❌ Socket bağlantısı kesildi:', reason);
+    console.log('❌ Socket bağlantısı kesildi:', reason, '→', serverUrl);
     isConnecting = false;
   });
 
   socketInstance.on('connect_error', (error) => {
-    console.error('❌ Socket bağlantı hatası:', error.message);
+    console.error('❌ Socket bağlantı hatası:', error.message, '→', serverUrl);
     isConnecting = false;
   });
 
   return socketInstance;
-}
-
-export function disconnectSocket() {
-  if (socketInstance) {
-    socketInstance.disconnect();
-    socketInstance = null;
-    isConnecting = false;
-  }
 }

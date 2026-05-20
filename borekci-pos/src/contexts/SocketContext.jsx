@@ -58,7 +58,9 @@ export const SocketProvider = ({ children }) => {
   const contextValue = useMemo(() => ({
     socket,
     isConnected,
-    serverUrl: 'http://localhost:3000' // Varsayılan, dinamik olarak ayarlanabilir
+    serverUrl: localStorage.getItem('serverIP')
+      ? `http://${localStorage.getItem('serverIP')}:3000`
+      : 'http://localhost:3000',
   }), [socket, isConnected]);
 
   return (

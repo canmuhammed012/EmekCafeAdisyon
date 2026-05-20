@@ -66,13 +66,16 @@ function startBackend() {
       console.log('\n🚀 Server fork ediliyor...');
       
       // Server'ı ayrı process olarak başlat
+      const isPrimaryServer = process.env.PRIMARY_SERVER === 'true';
+
       serverProcess = fork(serverPath, [], {
         env: {
           ...process.env,
           NODE_ENV: 'production',
           PORT: '3000',
           DB_PATH: dbPath,
-          NODE_PATH: nodePath
+          NODE_PATH: nodePath,
+          PRIMARY_SERVER: isPrimaryServer ? 'true' : 'false',
         },
         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
         // ASAR unpacked klasörünü cwd olarak kullan

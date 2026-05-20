@@ -19,8 +19,11 @@ const Tables = ({ user, onLogout, onOpenScreensaver }) => {
         setTables(response.data || []);
       } catch (error) {
         console.error('Masalar yüklenemedi:', error);
+        // Network hatası veya timeout durumunda boş array set et
         setTables([]);
+        // Hata mesajı gösterilmesi gerekirse burada eklenebilir
       } finally {
+        // Her durumda loading'i false yap - internet yavaşladığında takılı kalmasın
         setLoading(false);
       }
     };

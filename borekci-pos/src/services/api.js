@@ -19,6 +19,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 saniye timeout - local network için yeterli
 });
 
 // Her API çağrısında güncel URL'i kullanmak için interceptor ekle
@@ -90,8 +91,13 @@ export const getReceipt = (tableId) => api.get(`/receipt/${tableId}`);
 
 // Printers
 export const getPrinters = () => api.get('/printers');
-// printerType: 'windows' | 'usb' | 'auto'
-// printerName: Windows yazıcı adı (örn: "XP-80", "POS-80")
+export const getWindowsPrinters = () => api.get('/printers/windows');
+export const printTestReceipt = (printerName = null) => {
+  const payload = {};
+  if (printerName) payload.printerName = printerName;
+  return api.post('/print/test', payload);
+};
+// printerType: 'windows' (RAW ESC/POS — Xprinter XP-90 / XP9000)
 export const printReceipt = (tableId, printerName = null, printerType = 'windows') => {
   const payload = { tableId, printerType };
   if (printerName) payload.printerName = printerName;

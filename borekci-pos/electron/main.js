@@ -9,9 +9,49 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.emekcafe.adisyon');
 }
 
+// Tek instance kontrolü - uygulamanın 2 kere açılmasını engelle
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Eğer başka bir instance zaten çalışıyorsa, bu instance'ı kapat
+  console.log('⚠️ Uygulama zaten çalışıyor, bu instance kapatılıyor...');
+  app.quit();
+} else {
+  // İlk instance - başka bir instance açılmaya çalışıldığında
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Eğer ana pencere minimize edilmişse veya gizlenmişse, göster
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+    }
+  });
+}
+
 let mainWindow;
 let backendLoader;
 let themeCheckInterval;
+
+function getDeviceConfigPath() {
+  return path.join(app.getPath('userData'), 'device-config.json');
+}
+
+function readDeviceConfig() {
+  try {
+    const configPath = getDeviceConfigPath();
+    if (fs.existsSync(configPath)) {
+      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+  } catch (err) {
+    console.warn('device-config okunamadı:', err.message);
+  }
+  return { role: 'server' };
+}
+
+function writeDeviceConfig(config) {
+  fs.writeFileSync(getDeviceConfigPath(), JSON.stringify(config, null, 2), 'utf8');
+}
 
 function createWindow() {
   // Ekran boyutunu al
@@ -99,12 +139,29 @@ function createWindow() {
     show: false,
     backgroundColor: '#ffffff', // Varsayılan beyaz tema
   });
+
+  // Windows için icon'u hemen ayarla (görev çubuğu için)
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.emekcafe.adisyon');
+    if (iconPath && fs.existsSync(iconPath)) {
+      mainWindow.setIcon(iconPath);
+      console.log('✅ Icon ayarlandı (pencere oluşturulurken):', iconPath);
+    }
+  }
   
   // Menü çubuğunu tamamen kaldır
   mainWindow.setMenuBarVisibility(false);
   mainWindow.setMenu(null);
 
   mainWindow.once('ready-to-show', () => {
+    // Icon'u tekrar ayarla (görev çubuğu için)
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.emekcafe.adisyon');
+      if (iconPath && fs.existsSync(iconPath)) {
+        mainWindow.setIcon(iconPath);
+        console.log('✅ Icon ayarlandı (ready-to-show):', iconPath);
+      }
+    }
     mainWindow.show();
   });
   
@@ -116,6 +173,7 @@ function createWindow() {
       // Icon'u tekrar set et (güncelleme sonrası için)
       if (iconPath && fs.existsSync(iconPath)) {
         mainWindow.setIcon(iconPath);
+        console.log('✅ Icon ayarlandı (did-finish-load):', iconPath);
       }
     }
     
@@ -162,13 +220,19 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // Production - Frontend'i hemen yükle, backend paralel başlasın
+    // Production - Frontend'i hemen yükle
     loadFrontendFromFile();
     
-    // Backend'i paralel başlat (frontend'i bekletme)
-    startBackend().catch((err) => {
-      console.error('Backend başlatma hatası:', err);
-    });
+    // Sadece admin (server) cihazında yerel backend başlat
+    const deviceConfig = readDeviceConfig();
+    if (deviceConfig.role === 'client') {
+      console.log('📱 İstemci (garson) modu — yerel backend başlatılmıyor');
+    } else {
+      process.env.PRIMARY_SERVER = 'true';
+      startBackend().catch((err) => {
+        console.error('Backend başlatma hatası:', err);
+      });
+    }
   }
   
   // Production'da reload'u engelle
@@ -352,6 +416,82 @@ function showError(title, message) {
 }
 
 // IPC Handlers
+ipcMain.handle('get-device-role', () => {
+  return readDeviceConfig().role || 'server';
+});
+
+ipcMain.handle('set-device-role', (_event, role) => {
+  const validRole = role === 'client' ? 'client' : 'server';
+  writeDeviceConfig({ role: validRole });
+  console.log(`📱 Cihaz rolü kaydedildi: ${validRole}`);
+  return { ok: true, restartRequired: true };
+});
+
+function loadWinRawPrint() {
+  const candidates = [
+    path.join(__dirname, '..', 'windows-raw-print.js'),
+    path.join(process.resourcesPath || '', 'windows-raw-print.js'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return require(candidate);
+    }
+  }
+  throw new Error('windows-raw-print modülü bulunamadı');
+}
+
+ipcMain.handle('list-local-printers', () => {
+  if (process.platform !== 'win32') {
+    return { printers: [] };
+  }
+  try {
+    const winRawPrint = loadWinRawPrint();
+    return { printers: winRawPrint.listWindowsPrinters() };
+  } catch (error) {
+    console.error('Yerel yazıcı listesi:', error);
+    return { printers: [], error: error.message };
+  }
+});
+
+ipcMain.handle('print-receipt-local', (_event, { receipt, printerName }) => {
+  if (process.platform !== 'win32') {
+    return { success: false, error: 'Yerel yazdırma yalnızca Windows\'ta desteklenir' };
+  }
+  try {
+    const winRawPrint = loadWinRawPrint();
+    const printers = winRawPrint.listWindowsPrinters();
+    const selected = winRawPrint.matchPrinter(printers, printerName || null);
+
+    if (!selected) {
+      return {
+        success: false,
+        error: 'Bu cihazda termal yazıcı bulunamadı',
+        availablePrinters: printers.map((p) => p.name),
+      };
+    }
+
+    const buffer = winRawPrint.buildEscPosReceipt({
+      restaurantName: receipt.restaurantName,
+      tableName: receipt.tableName,
+      orders: receipt.orders,
+      total: receipt.total,
+      date: receipt.date,
+    });
+
+    winRawPrint.printRawWindows(selected.name, buffer);
+    console.log(`✅ Yerel fiş yazdırıldı: ${selected.name}`);
+
+    return {
+      success: true,
+      message: `Fiş yazdırıldı (${selected.name})`,
+      printer: selected.name,
+    };
+  } catch (error) {
+    console.error('Yerel yazdırma hatası:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.on('get-version', (event) => {
   event.returnValue = app.getVersion();
 });
@@ -383,14 +523,37 @@ app.whenReady().then(() => {
       const resourcesPath = path.join(process.resourcesPath, 'logo.ico');
       if (fs.existsSync(resourcesPath)) {
         iconPath = resourcesPath;
-        // Ana pencere oluşturulduktan sonra icon'u set et
-        setTimeout(() => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.setIcon(iconPath);
-            console.log('✅ Görev çubuğu icon ayarlandı:', iconPath);
+        console.log('✅ Icon path bulundu (whenReady):', iconPath);
+      } else {
+        // Alternatif yolları dene
+        const altPaths = [
+          path.join(process.resourcesPath, 'public', 'logo.ico'),
+          path.join(app.getAppPath(), 'logo.ico'),
+          path.join(__dirname, '..', 'public', 'logo.ico')
+        ];
+        for (const altPath of altPaths) {
+          if (fs.existsSync(altPath)) {
+            iconPath = altPath;
+            console.log('✅ Alternatif icon path bulundu:', iconPath);
+            break;
           }
-        }, 100);
+        }
       }
+    } else {
+      const icoPath = path.join(__dirname, '..', 'public', 'logo.ico');
+      if (fs.existsSync(icoPath)) {
+        iconPath = icoPath;
+      }
+    }
+    
+    // Ana pencere oluşturulduktan sonra icon'u set et
+    if (iconPath) {
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setIcon(iconPath);
+          console.log('✅ Görev çubuğu icon ayarlandı (whenReady):', iconPath);
+        }
+      }, 200); // 200ms bekle (pencere oluşturulması için)
     }
   }
   
@@ -493,6 +656,25 @@ if (app.isPackaged) {
     console.log('\n🎉 ========== YENİ GÜNCELLEME MEVCUT! ==========');
     console.log('🆕 Yeni versiyon:', info.version);
     console.log('📦 Mevcut versiyon:', app.getVersion());
+    
+    // Versiyon karşılaştırması - v prefix'ini ve whitespace'i kaldır
+    const currentVersion = app.getVersion().replace(/^v/i, '').trim();
+    const newVersion = (info.version || '').replace(/^v/i, '').trim();
+    
+    console.log('🔍 Versiyon karşılaştırması:');
+    console.log('   Mevcut (temizlenmiş):', currentVersion);
+    console.log('   Yeni (temizlenmiş):', newVersion);
+    
+    // Eğer versiyonlar aynıysa, güncelleme yapma
+    if (currentVersion === newVersion) {
+      console.log('⚠️ Versiyonlar aynı! Güncelleme atlanıyor...');
+      console.log('💡 Bu normal bir durum - zaten en güncel sürümü kullanıyorsunuz.');
+      console.log('==============================================\n');
+      return; // Güncellemeyi durdur
+    }
+    
+    // Versiyonlar farklıysa devam et
+    console.log('✅ Versiyonlar farklı, güncelleme devam ediyor...');
     console.log('📅 Release tarihi:', info.releaseDate);
     console.log('📝 Güncelleme notları:', info.releaseNotes || 'Yok');
     console.log('📦 Tam güncelleme bilgileri:', JSON.stringify(info, null, 2));
@@ -555,6 +737,20 @@ if (app.isPackaged) {
   autoUpdater.on('update-not-available', (info) => {
     console.log('\n✅ ========== GÜNCELLEME YOK ==========');
     console.log('📦 Mevcut versiyon:', app.getVersion());
+    
+    // Eğer info varsa, karşılaştırma yap
+    if (info && info.version) {
+      const currentVersion = app.getVersion().replace(/^v/i, '').trim();
+      const latestVersion = (info.version || '').replace(/^v/i, '').trim();
+      console.log('🔍 Versiyon karşılaştırması:');
+      console.log('   Mevcut:', currentVersion);
+      console.log('   Latest:', latestVersion);
+      
+      if (currentVersion === latestVersion) {
+        console.log('✅ Versiyonlar eşleşiyor - güncelleme gerekmiyor');
+      }
+    }
+    
     console.log('✅ Zaten en güncel sürümü kullanıyorsunuz!');
     console.log('📅 Kontrol zamanı:', new Date().toLocaleString('tr-TR'));
     console.log('=====================================\n');
@@ -590,6 +786,26 @@ if (app.isPackaged) {
   autoUpdater.on('update-downloaded', (info) => {
     console.log('\n🎊 ========== GÜNCELLEME İNDİRİLDİ! ==========');
     console.log('✅ İndirilen versiyon:', info.version);
+    console.log('📦 Mevcut versiyon:', app.getVersion());
+    
+    // Versiyon karşılaştırması - indirilen versiyon mevcut versiyonla aynıysa kurma
+    const currentVersion = app.getVersion().replace(/^v/i, '').trim();
+    const downloadedVersion = (info.version || '').replace(/^v/i, '').trim();
+    
+    console.log('🔍 Versiyon karşılaştırması (indirilen):');
+    console.log('   Mevcut (temizlenmiş):', currentVersion);
+    console.log('   İndirilen (temizlenmiş):', downloadedVersion);
+    
+    // Eğer versiyonlar aynıysa, kurulumu atla
+    if (currentVersion === downloadedVersion) {
+      console.log('⚠️ İndirilen versiyon mevcut versiyonla aynı! Kurulum atlanıyor...');
+      console.log('💡 Bu normal bir durum - zaten en güncel sürümü kullanıyorsunuz.');
+      console.log('==============================================\n');
+      // Renderer'a bildirme - versiyonlar aynıysa güncelleme gerekmiyor
+      return; // Kurulumu durdur
+    }
+    
+    console.log('✅ Versiyonlar farklı, kurulum devam edebilir...');
     console.log('📅 İndirme zamanı:', new Date().toLocaleString('tr-TR'));
     console.log('📦 Güncelleme bilgileri:', JSON.stringify(info, null, 2));
     
