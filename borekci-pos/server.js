@@ -1252,7 +1252,7 @@ app.post('/api/print/test', (req, res) => {
 });
 
 const { registerPrintReceiptRoute } = require('./print-receipt-route');
-registerPrintReceiptRoute(app, db, winRawPrint);
+registerPrintReceiptRoute(app, db, winRawPrint, broadcast);
 
 // Sunucu bilgilerini getir
 // Health check endpoint - Backend hazır mı kontrolü için

@@ -1,13 +1,9 @@
-function registerPrintReceiptRoute(app, db, winRawPrint) {
+function registerPrintReceiptRoute(app, db, winRawPrint, broadcast) {
   app.post('/api/print/receipt', (req, res) => {
-    const { tableId, printerName: reqPrinterName, printerType = 'windows' } = req.body;
+    const { tableId, printerName: reqPrinterName } = req.body;
 
     if (!tableId) {
       return res.status(400).json({ error: 'Masa ID gerekli' });
-    }
-
-    if (process.platform !== 'win32') {
-      return res.status(400).json({ error: 'Fiş yazdırma yalnızca Windows admin PC üzerinde desteklenir' });
     }
 
     db.get(`SELECT * FROM tables WHERE id = ?`, [tableId], (err, table) => {
@@ -36,39 +32,55 @@ function registerPrintReceiptRoute(app, db, winRawPrint) {
               const savedPrinterName = printerRow?.value?.trim() || '';
               const targetPrinterName = reqPrinterName?.trim() || savedPrinterName || null;
 
-              try {
-                const printers = winRawPrint.listWindowsPrinters();
-                const selected = winRawPrint.matchPrinter(printers, targetPrinterName);
+              const now = new Date();
+              const receipt = {
+                restaurantName,
+                tableName: table.name,
+                orders,
+                total: table.total,
+                date: `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+              };
 
-                if (!selected) {
-                  return res.status(404).json({
-                    error: 'Termal yazıcı bulunamadı. Windows\'ta Xprinter (XP-90) kurulu ve açık olmalı.',
-                    availablePrinters: printers.map((p) => p.name),
-                  });
+              // Tum bagli cihazlara (garson tablet vb.) yazdirma istegi
+              broadcast('printReceipt', {
+                receipt,
+                printerName: targetPrinterName,
+                tableId,
+              });
+
+              console.log(`📡 Fiş yazdırma yayınlandı (masa ${table.name})`);
+
+              // Admin sunucusunda da yazici varsa oradan da yazdir
+              let localPrinter = null;
+              if (process.platform === 'win32') {
+                try {
+                  const printers = winRawPrint.listWindowsPrinters();
+                  const selected = winRawPrint.matchPrinter(printers, targetPrinterName);
+                  if (selected) {
+                    const buffer = winRawPrint.buildEscPosReceipt(receipt);
+                    winRawPrint.printRawWindows(selected.name, buffer);
+                    localPrinter = selected.name;
+                    console.log(`✅ Sunucu yerel yazdırma: ${selected.name}`);
+                  }
+                } catch (localErr) {
+                  console.warn('Sunucu yerel yazdırma atlandı:', localErr.message);
                 }
-
-                const buffer = winRawPrint.buildEscPosReceipt({
-                  restaurantName,
-                  tableName: table.name,
-                  orders,
-                  total: table.total,
-                  date: new Date().toLocaleString('tr-TR'),
-                });
-
-                winRawPrint.printRawWindows(selected.name, buffer);
-
-                console.log(`✅ Fiş yazdırıldı: ${selected.name} (masa ${table.name})`);
-
-                res.json({
-                  success: true,
-                  message: `Fiş yazdırıldı (${selected.name})`,
-                  printer: selected.name,
-                  printerType: 'windows-raw',
-                });
-              } catch (printError) {
-                console.error('❌ Fiş yazdırma hatası:', printError);
-                res.status(500).json({ error: printError.message });
               }
+
+              if (localPrinter) {
+                return res.json({
+                  success: true,
+                  message: `Fiş yazdırıldı (${localPrinter})`,
+                  printer: localPrinter,
+                  mode: 'server',
+                });
+              }
+
+              res.json({
+                success: true,
+                message: 'Fiş yazdırma isteği gönderildi (yazıcıya bağlı cihazdan çıkacak)',
+                mode: 'broadcast',
+              });
             });
           });
         }

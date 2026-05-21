@@ -338,14 +338,14 @@ const TableDetail = ({ user }) => {
   const handlePrintReceipt = async () => {
     try {
       const result = await printTableReceipt(parseInt(id));
-      const where =
-        result.printedOn === 'local'
-          ? 'bu cihazdaki yazıcıdan'
-          : 'kasa (admin) bilgisayarından';
+      const hint =
+        result.printedOn === 'server'
+          ? 'kasa bilgisayarındaki yazıcıdan'
+          : 'yazıcıya bağlı cihazdan (garson veya kasa)';
       setAlertModal({
         isOpen: true,
         title: 'Başarılı',
-        message: `${result.message}\n(${where})`,
+        message: `${result.message}\n(${hint})`,
         type: 'success',
       });
     } catch (error) {

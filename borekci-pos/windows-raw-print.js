@@ -70,21 +70,24 @@ function matchPrinter(printers, requestedName) {
   return printers[0];
 }
 
-/** Türkçe karakterler için CP857 (ESC/POS yaygın) */
-function encodeReceiptText(text) {
-  const iconv = tryRequireIconv();
-  if (iconv) {
-    return iconv.encode(text, 'cp857');
-  }
-  return Buffer.from(text, 'latin1');
+/** Türkçe karakterleri ASCII'ye çevir (termal yazıcı uyumu) */
+function toAsciiReceipt(text) {
+  const map = {
+    ç: 'c', Ç: 'C', ğ: 'g', Ğ: 'G', ı: 'i', İ: 'I',
+    ö: 'o', Ö: 'O', ş: 's', Ş: 'S', ü: 'u', Ü: 'U',
+    â: 'a', Â: 'A', î: 'i', Î: 'I', û: 'u', Û: 'U',
+    é: 'e', É: 'E', è: 'e', È: 'E', ê: 'e', Ê: 'E',
+    '₺': 'TL',
+  };
+  return String(text || '')
+    .split('')
+    .map((ch) => map[ch] ?? ch)
+    .join('')
+    .replace(/[^\x20-\x7E\n\r\t]/g, '');
 }
 
-function tryRequireIconv() {
-  try {
-    return require('iconv-lite');
-  } catch {
-    return null;
-  }
+function encodeReceiptText(text) {
+  return Buffer.from(toAsciiReceipt(text), 'ascii');
 }
 
 function buildEscPosReceipt({ restaurantName, tableName, orders, total, date }) {
@@ -121,7 +124,7 @@ function buildEscPosReceipt({ restaurantName, tableName, orders, total, date }) 
   add('(0212) 516 54 86\n');
   add('\nBizi tercih ettiginiz icin\n');
   add('tesekkur ederiz!\n');
-  add('\n\n\n');
+  add('\n\n\n\n\n\n');
   chunks.push(Buffer.from('\x1D\x56\x00')); // cut
 
   return Buffer.concat(chunks);

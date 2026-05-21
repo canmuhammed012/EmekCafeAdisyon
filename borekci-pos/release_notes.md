@@ -1,3 +1,4 @@
+v2.2.2 - Admin yazdırınca garson cihazındaki yazıcıya socket ile yönlendirme; fiş metni ASCII (Türkçe karakter yok); teşekkür satırı kesilmesin diye alt boşluk
 v2.2.1 - Fiş yazdırma: yazıcı hangi cihazda takılıysa (garson veya admin) o cihazdan çıktı; yoksa admin sunucusundaki yazıcıya düşer. Garson/admin ağ ve termal yazıcı (XP-90/XP9000) iyileştirmeleri.
 v2.2.0 - Garson/admin ağ bağlantısı düzeltildi (birincil sunucu tespiti, istemci modu), Xprinter termal yazıcı RAW ESC/POS yazdırma (XP-90/XP9000), yazıcı otomatik eşleştirme
 v1.9.19 - Otomatik release başlık/gövde düzeltildi, eski notlar kaldırıldı

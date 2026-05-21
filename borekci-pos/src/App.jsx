@@ -6,6 +6,7 @@ import { disconnectSocket } from './services/socket';
 import ProtectedRoute from './components/ProtectedRoute';
 import UpdateNotification from './components/UpdateNotification';
 import PaymentRequestNotification from './components/PaymentRequestNotification';
+import PrintSocketListener from './components/PrintSocketListener';
 import Screensaver from './components/Screensaver';
 import Login from './pages/Login';
 import Tables from './pages/Tables';
@@ -118,6 +119,7 @@ function App() {
       <Router>
         {user ? (
           <SocketProvider key={serverKey}>
+            <PrintSocketListener />
             {routes}
           </SocketProvider>
         ) : (
