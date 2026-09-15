@@ -268,33 +268,32 @@ jobs:
         $tag = "${{ github.ref_name }}"
         $ver = $tag.TrimStart('v')
         $notesFile = "borekci-pos/release_notes.md"
-        $title = $tag
+        # Başlık her zaman kısa: "Emek Cafe Adisyon v2.3.0" (GitHub sınırı 256 karakter)
+        $title = "Emek Cafe Adisyon $tag"
         $body = $tag
         if (Test-Path $notesFile) {
-          $lines = Get-Content $notesFile
-          # Satırı "vX.Y.Z - metin" formatında ara
-          $match = $lines | Where-Object { $_ -match "^$tag\s*-\s*" } | Select-Object -First 1
-          if (-not $match) {
-            $match = $lines | Where-Object { $_ -match "^$ver\s*-\s*" } | Select-Object -First 1
+          $lines = Get-Content $notesFile -Encoding UTF8
+          $start = -1
+          for ($i = 0; $i -lt $lines.Length; $i++) {
+            if ($lines[$i] -match "^(v)?$([regex]::Escape($ver))\s*-\s*") { $start = $i; break }
           }
-          if ($match) {
-            # Başlık: ilk satır
-            $title = $match
-            # Body: Eşleşen satırdan itibaren boş satır veya dosya sonuna kadar
-            $start = [Array]::IndexOf($lines, $match)
-            if ($start -ge 0) {
-              $rest = $lines[$start..($lines.Length-1)]
-              $body = ($rest -join "`n").Trim()
-            } else {
-              $body = $match
+          if ($start -ge 0) {
+            # Eşleşen satırdan bir sonraki sürüm satırına kadar olan bölüm gövde olur
+            $collected = @()
+            for ($j = $start; $j -lt $lines.Length; $j++) {
+              if ($j -gt $start -and $lines[$j] -match "^v?\d+\.\d+\.\d+\s*-") { break }
+              $collected += $lines[$j]
             }
+            $text = ($collected -join "`n").Trim()
+            # "vX.Y.Z - " önekini at, ";" ile ayrılmış maddeleri liste yap
+            $text = $text -replace "^v?$([regex]::Escape($ver))\s*-\s*", ""
+            $items = $text -split ";\s*" | Where-Object { $_.Trim() -ne "" } | ForEach-Object { "- " + $_.Trim() }
+            if ($items.Count -gt 0) { $body = ($items -join "`n") } else { $body = $text }
           }
         }
         Write-Host "title=$title"
-        Write-Host "body<<'EOF'"
+        Write-Host "body:"
         Write-Host $body
-        Write-Host "EOF"
-        # Çıktılara yaz (GITHUB_OUTPUT multiline destekler)
         $delimiter = "EOF_$(New-Guid)"
         echo "title=$title" >> $env:GITHUB_OUTPUT
         echo "body<<$delimiter" >> $env:GITHUB_OUTPUT
