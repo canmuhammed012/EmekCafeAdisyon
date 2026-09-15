@@ -1,72 +1,63 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
-const AlertModal = ({ isOpen, onClose, title, message, type = 'info', icon = null }) => {
+const TYPE_STYLES = {
+  success: { btn: 'btn-success', icon: '✅', title: 'text-emerald-600 dark:text-emerald-400' },
+  error: { btn: 'btn-danger', icon: '❌', title: 'text-red-600 dark:text-red-400' },
+  warning: { btn: 'btn-warning', icon: '⚠️', title: 'text-amber-600 dark:text-amber-400' },
+  info: { btn: 'btn-primary', icon: 'ℹ️', title: 'text-blue-600 dark:text-blue-400' },
+};
+
+/**
+ * Bilgi/uyarı penceresi. `onConfirm` verilirse onay penceresi olur (İptal / Onayla).
+ */
+const AlertModal = ({
+  isOpen,
+  onClose,
+  title,
+  message,
+  type = 'info',
+  icon = null,
+  onConfirm = null,
+  confirmText = 'Onayla',
+  cancelText = 'İptal',
+  closeText = 'Tamam',
+}) => {
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Enter' && onConfirm) onConfirm();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose, onConfirm]);
+
   if (!isOpen) return null;
-
-  // Tip'e göre renk ve varsayılan icon belirleme
-  const getTypeStyles = () => {
-    switch (type) {
-      case 'success':
-        return {
-          bgColor: 'bg-green-600',
-          hoverColor: 'hover:bg-green-700',
-          icon: icon || '✅',
-          titleColor: 'text-green-600 dark:text-green-400'
-        };
-      case 'error':
-        return {
-          bgColor: 'bg-red-600',
-          hoverColor: 'hover:bg-red-700',
-          icon: icon || '❌',
-          titleColor: 'text-red-600 dark:text-red-400'
-        };
-      case 'warning':
-        return {
-          bgColor: 'bg-yellow-600',
-          hoverColor: 'hover:bg-yellow-700',
-          icon: icon || '⚠️',
-          titleColor: 'text-yellow-600 dark:text-yellow-400'
-        };
-      default:
-        return {
-          bgColor: 'bg-blue-600',
-          hoverColor: 'hover:bg-blue-700',
-          icon: icon || 'ℹ️',
-          titleColor: 'text-blue-600 dark:text-blue-400'
-        };
-    }
-  };
-
-  const styles = getTypeStyles();
+  const styles = TYPE_STYLES[type] || TYPE_STYLES.info;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-center mb-6">
-          <div className="text-6xl mb-4">{styles.icon}</div>
-          {title && (
-            <h2 className={`text-2xl font-bold ${styles.titleColor} mb-2`}>
-              {title}
-            </h2>
-          )}
-          <p className="text-lg text-gray-700 dark:text-gray-300">
-            {message}
-          </p>
+    <div className="modal-backdrop z-[9999]" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="modal max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-body text-center py-6">
+          <div className="text-5xl mb-3 leading-none">{icon || styles.icon}</div>
+          {title && <h2 className={`text-xl font-bold mb-2 ${styles.title}`}>{title}</h2>}
+          {message && <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 whitespace-pre-line break-words">{message}</p>}
         </div>
-        
-        <div className="flex justify-center">
-          <button
-            onClick={onClose}
-            className={`${styles.bgColor} ${styles.hoverColor} text-white font-bold py-3 px-8 rounded-lg transition-all duration-150 transform active:scale-95 text-lg`}
-          >
-            Tamam
-          </button>
+        <div className="modal-footer justify-center">
+          {onConfirm ? (
+            <>
+              <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
+                {cancelText}
+              </button>
+              <button type="button" onClick={onConfirm} className={`btn ${styles.btn} flex-1`} autoFocus>
+                {confirmText}
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={onClose} className={`btn ${styles.btn} px-8`} autoFocus>
+              {closeText}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -74,4 +65,3 @@ const AlertModal = ({ isOpen, onClose, title, message, type = 'info', icon = nul
 };
 
 export default AlertModal;
-

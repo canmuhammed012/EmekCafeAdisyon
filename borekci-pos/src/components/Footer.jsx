@@ -1,14 +1,19 @@
 import React from 'react';
 
-const Footer = ({ className = '' }) => {
-  return (
-    <footer className={`text-center py-4 ${className}`}>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        © {new Date().getFullYear()} Emek Cafe - All Rights Reserved
-      </p>
-    </footer>
-  );
-};
+const version = (() => {
+  try {
+    return window.electron?.getVersion?.() || '';
+  } catch {
+    return '';
+  }
+})();
+
+const Footer = ({ className = '' }) => (
+  <footer className={`text-center py-2 px-3 ${className}`}>
+    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-500 truncate">
+      © {new Date().getFullYear()} Emek Cafe{version ? ` · v${version}` : ''}
+    </p>
+  </footer>
+);
 
 export default Footer;
-

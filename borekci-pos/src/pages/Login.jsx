@@ -1,285 +1,220 @@
-import React, { useState, useEffect } from 'react';
-import { login } from '../services/api';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { login, getErrorMessage, SERVER_PORT, isBrowserMode } from '../services/api';
 import { resetSocket } from '../services/socket';
 import Footer from '../components/Footer';
 
 const SERVER_INFO_TIMEOUT = 3000;
+const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 
-async function fetchServerInfo(host) {
-  const base = host ? `http://${host}:3000` : 'http://localhost:3000';
-  const response = await fetch(`${base}/api/server/info`, {
-    method: 'GET',
-    signal: AbortSignal.timeout(SERVER_INFO_TIMEOUT),
-  });
-  if (!response.ok) {
-    throw new Error('Server info alınamadı');
-  }
+async function fetchServerInfo(host, timeout = SERVER_INFO_TIMEOUT) {
+  const base = `http://${host || 'localhost'}:${SERVER_PORT}`;
+  const response = await fetch(`${base}/api/server/info`, { signal: AbortSignal.timeout(timeout) });
+  if (!response.ok) throw new Error('Sunucu bilgisi alınamadı');
   return response.json();
+}
+
+/** WebRTC ile cihazın yerel IP'sini bul (internet gerekmez) */
+function getLocalIP() {
+  return new Promise((resolve) => {
+    const RTC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+    if (!RTC) return resolve(null);
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      try {
+        pc.close();
+      } catch {
+        /* yoksay */
+      }
+      resolve(value);
+    };
+    const pc = new RTC({ iceServers: [] });
+    pc.createDataChannel('');
+    pc.onicecandidate = (event) => {
+      const match = event.candidate?.candidate?.match(/(\d{1,3}(\.\d{1,3}){3})/);
+      const ip = match?.[1];
+      if (ip && (ip.startsWith('192.168.') || ip.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(ip))) finish(ip);
+    };
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') finish(null);
+    };
+    pc.createOffer()
+      .then((offer) => pc.setLocalDescription(offer))
+      .catch(() => finish(null));
+    setTimeout(() => finish(null), 2000);
+  });
+}
+
+/** Aynı ağdaki birincil (kasa) sunucuyu tara */
+async function findAdminServer(onProgress) {
+  const myIP = await getLocalIP();
+  if (!myIP) return null;
+  const subnet = myIP.split('.').slice(0, 3).join('.');
+  const test = async (ip) => {
+    try {
+      const info = await fetchServerInfo(ip, 800);
+      return info.isPrimaryServer ? ip : null;
+    } catch {
+      return null;
+    }
+  };
+  const batchSize = 25;
+  for (let start = 1; start <= 254; start += batchSize) {
+    onProgress?.(Math.round((start / 254) * 100));
+    const ips = [];
+    for (let i = start; i < start + batchSize && i <= 254; i++) {
+      const ip = `${subnet}.${i}`;
+      if (ip !== myIP) ips.push(ip);
+    }
+    const results = await Promise.all(ips.map(test));
+    const found = results.find(Boolean);
+    if (found) return found;
+  }
+  return null;
 }
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [serverIP, setServerIP] = useState(localStorage.getItem('serverIP') || '');
-  const [currentDeviceIP, setCurrentDeviceIP] = useState('');
+  const [manualIP, setManualIP] = useState(localStorage.getItem('serverIP') || '');
+  const [editingIP, setEditingIP] = useState(false);
+  const [deviceRole, setDeviceRole] = useState(localStorage.getItem('deviceRole') || 'server');
+  const [roleChanged, setRoleChanged] = useState(false);
+  const [serverStatus, setServerStatus] = useState({ state: 'idle', message: '' }); // idle | searching | ok | error
+  const [scanProgress, setScanProgress] = useState(0);
+  const [deviceIP, setDeviceIP] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showServerIP, setShowServerIP] = useState(!localStorage.getItem('serverIP'));
-  const [deviceRole, setDeviceRole] = useState(
-    localStorage.getItem('deviceRole') || 'server'
-  );
+  const busyRef = useRef(false);
 
-  // Cihaz rolünü yükle (Electron istemci modu)
+  const version = window.electron?.getVersion?.() || '';
+
   useEffect(() => {
-    const loadDeviceRole = async () => {
+    (async () => {
       if (window.electron?.getDeviceRole) {
         try {
           const role = await window.electron.getDeviceRole();
           setDeviceRole(role);
           localStorage.setItem('deviceRole', role);
-        } catch (e) {
-          console.log('Cihaz rolü okunamadı:', e);
+        } catch {
+          /* yoksay */
         }
       }
-    };
-    loadDeviceRole();
+    })();
   }, []);
 
+  const saveServerIP = (ip) => {
+    if (ip) localStorage.setItem('serverIP', ip);
+    else localStorage.removeItem('serverIP');
+    setServerIP(ip);
+    setManualIP(ip);
+  };
+
+  /** Kasa sunucusunu bul: önce localhost, sonra kayıtlı IP, sonra ağ taraması */
+  const resolveServer = useCallback(async () => {
+    if (busyRef.current) return null;
+    busyRef.current = true;
+    setServerStatus({ state: 'searching', message: 'Kasa sunucusu aranıyor…' });
+    setScanProgress(0);
+    try {
+      // Telefon/tablet tarayıcısından http://<kasa-ip>:3000 ile açıldı: sunucu bu adres
+      if (isBrowserMode()) {
+        try {
+          const response = await fetch(`${window.location.origin}/api/server/info`, { signal: AbortSignal.timeout(SERVER_INFO_TIMEOUT) });
+          const info = await response.json();
+          setServerStatus({ state: 'ok', message: `Kasa sunucusuna bağlı (${info.ip || window.location.hostname})` });
+          return window.location.hostname;
+        } catch {
+          setServerStatus({ state: 'error', message: 'Kasa sunucusuna ulaşılamadı. Kasa bilgisayarının açık olduğundan emin olun.' });
+          return null;
+        }
+      }
+      if (deviceRole === 'server') {
+        try {
+          const info = await fetchServerInfo(null);
+          if (info.isPrimaryServer) {
+            setDeviceIP(info.ip);
+            saveServerIP('');
+            setServerStatus({ state: 'ok', message: `Bu cihaz kasa sunucusu (${info.ip})` });
+            return '';
+          }
+        } catch {
+          /* yerel sunucu yok */
+        }
+      }
+
+      const saved = localStorage.getItem('serverIP');
+      if (saved) {
+        try {
+          const info = await fetchServerInfo(saved);
+          if (info.isPrimaryServer) {
+            saveServerIP(saved);
+            setServerStatus({ state: 'ok', message: `Kasa sunucusuna bağlı: ${saved}` });
+            return saved;
+          }
+        } catch {
+          /* kayıtlı IP artık geçerli değil */
+        }
+      }
+
+      const found = await findAdminServer(setScanProgress);
+      if (found) {
+        saveServerIP(found);
+        setServerStatus({ state: 'ok', message: `Kasa sunucusu bulundu: ${found}` });
+        return found;
+      }
+
+      const ip = await getLocalIP();
+      if (ip) setDeviceIP(ip);
+      setServerStatus({
+        state: 'error',
+        message:
+          deviceRole === 'server'
+            ? 'Yerel sunucu çalışmıyor. Uygulamayı yeniden başlatın veya bu cihazı "Garson" olarak ayarlayın.'
+            : 'Kasa sunucusu bulunamadı. Aynı Wi‑Fi ağında olduğunuzdan emin olun veya IP adresini elle girin.',
+      });
+      return null;
+    } finally {
+      busyRef.current = false;
+    }
+  }, [deviceRole]);
+
+  useEffect(() => {
+    resolveServer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceRole]);
+
   const applyDeviceRole = async (role) => {
+    if (role === deviceRole) return;
     setDeviceRole(role);
     localStorage.setItem('deviceRole', role);
     if (window.electron?.setDeviceRole) {
       await window.electron.setDeviceRole(role);
+      setRoleChanged(true);
     }
   };
 
-  // Admin sunucusunu bul (birincil sunucu = isPrimaryServer)
-  const resolveAdminServerIP = async () => {
-    if (deviceRole === 'server') {
-      try {
-        const info = await fetchServerInfo(null);
-        if (info.isPrimaryServer) {
-          setCurrentDeviceIP(info.ip);
-          localStorage.removeItem('serverIP');
-          setServerIP('');
-          setShowServerIP(false);
-          return '';
-        }
-        console.log('Localhost birincil sunucu değil, ağda admin aranıyor...');
-      } catch (err) {
-        console.log('Localhost erişilemedi:', err.message);
-      }
+  const applyManualIP = async () => {
+    const ip = manualIP.trim();
+    if (!IPV4_RE.test(ip)) {
+      setError('Geçerli bir IP adresi girin (örn. 192.168.1.100)');
+      return;
     }
-
-    const savedIP = localStorage.getItem('serverIP');
-    if (savedIP) {
-      try {
-        const info = await fetchServerInfo(savedIP);
-        if (info.isPrimaryServer) {
-          setServerIP(savedIP);
-          setShowServerIP(false);
-          return savedIP;
-        }
-      } catch (e) {
-        console.log('Kaydedilmiş IP birincil sunucu değil:', savedIP);
-      }
-    }
-
-    const foundIP = await findAdminServer();
-    if (foundIP) {
-      setServerIP(foundIP);
-      localStorage.setItem('serverIP', foundIP);
-      setShowServerIP(false);
-      return foundIP;
-    }
-
-    getLocalIP().then((ip) => {
-      if (ip) setCurrentDeviceIP(ip);
-    }).catch(() => {});
-
-    return null;
-  };
-
-  useEffect(() => {
-    resolveAdminServerIP().catch(() => {
-      console.log('Admin sunucu otomatik bulunamadı');
-    });
-  }, [deviceRole]);
-
-  // Network'te admin server'ı otomatik bul (aynı WiFi ağında)
-  const findAdminServer = async () => {
-    return new Promise((resolve) => {
-      // Kendi IP'mizi al
-      getLocalIP().then(myIP => {
-        if (!myIP) {
-          resolve(null);
-          return;
-        }
-        
-        // IP'nin subnet'ini bul (örn: 192.168.1.100 -> 192.168.1)
-        const ipParts = myIP.split('.');
-        if (ipParts.length !== 4) {
-          resolve(null);
-          return;
-        }
-        
-        const subnet = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
-        console.log(`🔍 Network taraması başlatılıyor: ${subnet}.x`);
-        
-        // IP test fonksiyonu
-        const testIP = (ip) => {
-          return new Promise((resolveTest) => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 800); // 800ms timeout
-            
-            fetch(`http://${ip}:3000/api/server/info`, {
-              method: 'GET',
-              signal: controller.signal
-            })
-            .then(async (response) => {
-              clearTimeout(timeoutId);
-              if (response.ok) {
-                try {
-                  const data = await response.json();
-                  resolveTest(data.isPrimaryServer ? ip : null);
-                } catch {
-                  resolveTest(null);
-                }
-              } else {
-                resolveTest(null);
-              }
-            })
-            .catch(() => {
-              clearTimeout(timeoutId);
-              resolveTest(null);
-            });
-          });
-        };
-        
-        // Batch'ler halinde tara (her seferinde 20 IP, daha hızlı)
-        const batchSize = 20;
-        let currentBatch = 0;
-        let found = false;
-        
-        const scanBatch = async () => {
-          if (found) return;
-          
-          const start = currentBatch * batchSize + 1;
-          const end = Math.min((currentBatch + 1) * batchSize, 254);
-          
-          const promises = [];
-          for (let i = start; i <= end; i++) {
-            const testIPAddr = `${subnet}.${i}`;
-            // Kendi IP'mizi atla
-            if (testIPAddr === myIP) continue;
-            promises.push(testIP(testIPAddr));
-          }
-          
-          // İlk bulunan IP'yi kullan
-          const results = await Promise.allSettled(promises);
-          for (const result of results) {
-            if (result.status === 'fulfilled' && result.value) {
-              console.log(`✅ Admin server bulundu: ${result.value}`);
-              found = true;
-              resolve(result.value);
-              return;
-            }
-          }
-          
-          // Sonraki batch'e geç
-          currentBatch++;
-          if (currentBatch * batchSize < 254 && !found) {
-            setTimeout(scanBatch, 50); // 50ms bekle, sonra devam et
-          } else if (!found) {
-            console.log('❌ Admin server bulunamadı');
-            resolve(null);
-          }
-        };
-        
-        // İlk batch'i başlat
-        scanBatch();
-      }).catch(() => {
-        resolve(null);
-      });
-    });
-  };
-
-  // WebRTC kullanarak local IP'yi al (internet gerektirmez, sadece local network)
-  const getLocalIP = () => {
-    return new Promise((resolve, reject) => {
-      const RTCPeerConnection = window.RTCPeerConnection || 
-                                window.mozRTCPeerConnection || 
-                                window.webkitRTCPeerConnection;
-      
-      if (!RTCPeerConnection) {
-        resolve(null);
+    setError('');
+    setServerStatus({ state: 'searching', message: `${ip} kontrol ediliyor…` });
+    try {
+      const info = await fetchServerInfo(ip);
+      if (!info.isPrimaryServer) {
+        setServerStatus({ state: 'error', message: `${ip} kasa sunucusu değil (garson cihazı olabilir).` });
         return;
       }
-
-      // STUN server olmadan da çalışabilir (internet gerektirmez)
-      // Ancak bazı tarayıcılarda STUN olmadan çalışmayabilir, o yüzden boş array kullanıyoruz
-      const pc = new RTCPeerConnection({
-        iceServers: [] // STUN server olmadan - internet gerektirmez
-      });
-
-      pc.createDataChannel('');
-      
-      let resolved = false;
-      
-      pc.onicecandidate = (event) => {
-        if (event.candidate && !resolved) {
-          const candidate = event.candidate.candidate;
-          const match = candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
-          if (match && match[1]) {
-            const ip = match[1];
-            // Local IP'leri filtrele (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-            if (ip.startsWith('192.168.') || 
-                ip.startsWith('10.') || 
-                /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) {
-              resolved = true;
-              pc.close();
-              resolve(ip);
-            }
-          }
-        }
-      };
-
-      // Ice gathering tamamlandığında kontrol et
-      pc.onicegatheringstatechange = () => {
-        if (pc.iceGatheringState === 'complete' && !resolved) {
-          // IP bulunamadı, sessizce null döndür
-          pc.close();
-          resolve(null);
-        }
-      };
-
-      pc.createOffer()
-        .then(offer => pc.setLocalDescription(offer))
-        .catch(() => {
-          if (!resolved) {
-            pc.close();
-            resolve(null);
-          }
-        });
-
-      // Timeout - 2 saniye yeterli (local network için)
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          pc.close();
-          resolve(null);
-        }
-      }, 2000);
-    });
-  };
-
-  // Server IP değiştiğinde localStorage'a kaydet
-  const handleServerIPChange = (newIP) => {
-    setServerIP(newIP);
-    if (newIP) {
-      localStorage.setItem('serverIP', newIP);
-    } else {
-      localStorage.removeItem('serverIP');
+      saveServerIP(ip);
+      setEditingIP(false);
+      setServerStatus({ state: 'ok', message: `Kasa sunucusuna bağlı: ${ip}` });
+    } catch {
+      setServerStatus({ state: 'error', message: `${ip}:${SERVER_PORT} adresine ulaşılamadı.` });
     }
   };
 
@@ -287,209 +222,143 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      let finalServerIP = serverIP;
-
-      if (!finalServerIP) {
-        setError('Admin sunucu aranıyor, lütfen bekleyin...');
-        const resolved = await resolveAdminServerIP();
-        setError('');
-        if (resolved === '') {
-          finalServerIP = '';
-        } else if (resolved) {
-          finalServerIP = resolved;
-        } else if (deviceRole === 'server') {
-          setError('Admin sunucu bulunamadı. Bu cihaz admin bilgisayarıysa uygulamayı yeniden başlatın.');
-          setLoading(false);
-          return;
-        } else {
-          setError('Admin sunucu bulunamadı. Modem/WiFi ağında olduğunuzdan ve admin PC\'nin açık olduğundan emin olun. IP\'yi manuel girin.');
+      if (serverStatus.state !== 'ok') {
+        const resolved = await resolveServer();
+        if (resolved === null) {
           setLoading(false);
           return;
         }
       }
-
-      if (finalServerIP) {
-        localStorage.setItem('serverIP', finalServerIP);
-        try {
-          const info = await fetchServerInfo(finalServerIP);
-          if (!info.isPrimaryServer) {
-            setError(`Bu IP birincil (admin) sunucu değil: ${finalServerIP}:3000`);
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          setError(`Server'a bağlanılamadı: ${finalServerIP}:3000\nİnternet gerekmez — modem/WiFi üzerinden aynı ağda olun.`);
-          setLoading(false);
-          return;
-        }
-      } else {
-        localStorage.removeItem('serverIP');
-      }
-
       resetSocket();
-
-      const response = await login({ username, password });
+      const response = await login({ username: username.trim(), password });
       onLogin(response.data);
     } catch (err) {
-      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        setError(`Bağlantı zaman aşımına uğradı. İnternet bağlantısı gerekmez, sadece WiFi ağına bağlı olduğunuzdan emin olun.\nServer IP: ${serverIP || 'localhost'}:3000`);
-      } else if (err.response?.status === 0 || err.code === 'ERR_NETWORK') {
-        // Network hatası - belki IP değişti, tekrar dene
-        if (!serverIP) {
-          setError(`Server'a bağlanılamadı. Admin server otomatik bulunamadı.\nLütfen admin bilgisayarının IP adresini manuel olarak girin.`);
-        } else {
-          setError(`Server'a bağlanılamadı. IP adresini kontrol edin: ${serverIP}:3000\nİnternet bağlantısı gerekmez, sadece WiFi ağına bağlı olduğunuzdan emin olun.`);
-        }
-      } else {
-        setError(err.response?.data?.error || 'Giriş başarısız');
-      }
+      setError(getErrorMessage(err, 'Giriş başarısız'));
     } finally {
       setLoading(false);
     }
   };
 
+  const statusColor = {
+    ok: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-200',
+    error: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-200',
+    searching: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-200',
+    idle: 'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-700/40 dark:border-gray-600 dark:text-gray-200',
+  }[serverStatus.state];
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-500 to-purple-600 dark:from-gray-900 dark:to-gray-800">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-          <div className="flex justify-center mb-4">
-            <img 
-              src="./logo.png" 
-              alt="Emek Cafe Logo" 
-              className="h-24 w-auto object-contain"
-              onError={(e) => {
-                // Logo yoksa gizle
-                e.target.style.display = 'none';
-              }}
-            />
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 dark:from-gray-950 dark:via-slate-900 dark:to-indigo-950">
+      <div className="flex-1 flex items-center justify-center p-3 sm:p-6">
+        <div className="card w-full max-w-md p-5 sm:p-7 shadow-2xl">
+          <div className="flex flex-col items-center mb-5">
+            <img src="./logo.png" alt="Emek Cafe" className="h-16 sm:h-20 w-auto object-contain mb-2" onError={(e) => (e.currentTarget.style.display = 'none')} />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Emek Cafe Adisyon</h1>
+            {version && <p className="text-xs text-gray-400 mt-0.5">v{version}</p>}
           </div>
-          <h1 className="text-3xl font-bold text-center mb-6 text-gray-800 dark:text-white">
-            Emek Cafe Adisyon
-          </h1>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-2">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Bu cihaz hangi rolde?</p>
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="radio"
-                  name="deviceRole"
-                  checked={deviceRole === 'server'}
-                  onChange={() => applyDeviceRole('server')}
-                />
-                Admin / Kasa (sunucu bu cihazda çalışır)
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="radio"
-                  name="deviceRole"
-                  checked={deviceRole === 'client'}
-                  onChange={() => applyDeviceRole('client')}
-                />
-                Garson / Tablet (admin bilgisayarına bağlanır)
-              </label>
-              {deviceRole === 'client' && (
-                <p className="text-xs text-amber-700 dark:text-amber-300">
-                  İstemci modu seçildikten sonra uygulamayı bir kez kapatıp açın (yerel sunucu kapanır).
-                </p>
+            {/* Cihaz rolü (yalnızca masaüstü uygulamasında) */}
+            {!isBrowserMode() && (
+            <div>
+              <span className="label">Bu cihazın görevi</span>
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-900">
+                {[
+                  { value: 'server', icon: '🖥️', label: 'Kasa / Yönetici', hint: 'Sunucu bu cihazda' },
+                  { value: 'client', icon: '📱', label: 'Garson', hint: 'Kasaya bağlanır' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => applyDeviceRole(opt.value)}
+                    className={`rounded-lg px-2 py-2 text-left transition ${
+                      deviceRole === opt.value ? 'bg-white dark:bg-gray-700 shadow-sm ring-1 ring-blue-500' : 'hover:bg-white/60 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      <span>{opt.icon}</span>
+                      <span className="truncate">{opt.label}</span>
+                    </div>
+                    <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{opt.hint}</div>
+                  </button>
+                ))}
+              </div>
+              {roleChanged && (
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  <span>Rol değişikliği için uygulamayı yeniden başlatın.</span>
+                  {window.electron?.relaunchApp && (
+                    <button type="button" onClick={() => window.electron.relaunchApp()} className="btn btn-sm btn-warning">
+                      Yeniden başlat
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-            {/* Cihazın Kendi IP'si */}
-            {currentDeviceIP && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                  Bu Cihazın IP Adresi: <span className="font-bold">{currentDeviceIP}</span>
-                </p>
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  {!serverIP ? 'Admin bilgisayarıysanız, bu IP\'yi garson bilgisayarına verin.' : 'Garson bilgisayarıysanız, admin bilgisayarının IP\'sini girin.'}
-                </p>
-              </div>
             )}
-            {/* Server IP Girişi - Sadece garson bilgisayarı için */}
-            {showServerIP && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Server IP (Admin Bilgisayarı IP'si)
-                </label>
-                <input
-                  type="text"
-                  value={serverIP}
-                  onChange={(e) => handleServerIPChange(e.target.value)}
-                  placeholder="örn: 192.168.1.100 (boş bırakırsanız localhost kullanılır)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Admin bilgisayarının IP adresini girin (örn: 192.168.1.100)
-                </p>
-              </div>
-            )}
-            {!showServerIP && serverIP && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Server IP: {serverIP}
-                  </p>
+
+            {/* Sunucu durumu */}
+            <div className={`rounded-xl border px-3 py-2.5 text-sm ${statusColor}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    {serverStatus.state === 'searching' && <span className="inline-block h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />}
+                    <span className="font-medium break-words">{serverStatus.message || 'Sunucu durumu bilinmiyor'}</span>
+                  </div>
+                  {serverStatus.state === 'searching' && scanProgress > 0 && <div className="text-xs opacity-70 mt-0.5">Ağ taraması %{scanProgress}</div>}
+                  {deviceIP && deviceRole === 'server' && (
+                    <div className="text-xs opacity-80 mt-1">
+                      Garson cihazlarına verilecek IP: <b className="select-all">{deviceIP}</b>
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowServerIP(true);
-                    setServerIP('');
-                    localStorage.removeItem('serverIP');
-                  }}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Değiştir
-                </button>
+                {deviceRole === 'client' && !isBrowserMode() && (
+                  <button type="button" onClick={() => setEditingIP((v) => !v)} className="text-xs underline whitespace-nowrap">
+                    {editingIP ? 'Kapat' : 'IP gir'}
+                  </button>
+                )}
               </div>
-            )}
+              {editingIP && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={manualIP}
+                    onChange={(e) => setManualIP(e.target.value)}
+                    placeholder="192.168.1.100"
+                    className="input flex-1"
+                    autoComplete="off"
+                  />
+                  <button type="button" onClick={applyManualIP} className="btn btn-primary">
+                    Bağlan
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Kullanıcı Adı
+              <label className="label" htmlFor="username">
+                Kullanıcı adı
               </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                required
-              />
+              <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="input" required autoComplete="username" autoCapitalize="none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="label" htmlFor="password">
                 Şifre
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                required
-              />
+              <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" required autoComplete="current-password" />
             </div>
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50"
-            >
-              {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+
+            {error && <div className="rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-200 px-3 py-2 text-sm whitespace-pre-line">{error}</div>}
+
+            <button type="submit" disabled={loading || serverStatus.state === 'searching'} className="btn btn-primary btn-lg w-full">
+              {loading ? 'Giriş yapılıyor…' : serverStatus.state === 'searching' ? 'Sunucu aranıyor…' : 'Giriş Yap'}
             </button>
           </form>
-          <div className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-            <p>Varsayılan: admin/admin veya garson/garson</p>
-          </div>
         </div>
       </div>
-      <Footer />
+      <Footer className="text-white/70 [&_p]:text-white/70" />
     </div>
   );
 };
 
 export default Login;
-

@@ -5,6 +5,9 @@ const { fork } = require('child_process');
 
 let serverProcess = null;
 let serverStarted = false;
+let stopping = false;
+let restartAttempts = 0;
+const MAX_RESTARTS = 10;
 
 function startBackend() {
   return new Promise((resolve, reject) => {
@@ -76,6 +79,7 @@ function startBackend() {
           DB_PATH: dbPath,
           NODE_PATH: nodePath,
           PRIMARY_SERVER: isPrimaryServer ? 'true' : 'false',
+          APP_VERSION: app.getVersion(),
         },
         stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
         // ASAR unpacked klasörünü cwd olarak kullan
@@ -100,11 +104,19 @@ function startBackend() {
         reject(error);
       });
       
-      // Process kapandığında
+      // Process kapandığında: uygulama kapanmıyorsa (ör. port kısa süre doluydu, beklenmeyen hata) yeniden başlat
       serverProcess.on('exit', (code, signal) => {
         console.log(`🛑 Server process kapandı (code: ${code}, signal: ${signal})`);
         serverStarted = false;
         serverProcess = null;
+        if (!stopping && restartAttempts < MAX_RESTARTS) {
+          restartAttempts += 1;
+          const delay = Math.min(10000, 1500 * restartAttempts);
+          console.log(`🔁 Backend ${delay} ms sonra yeniden başlatılıyor (deneme ${restartAttempts}/${MAX_RESTARTS})...`);
+          setTimeout(() => {
+            if (!stopping) startBackend().catch((err) => console.error('Backend yeniden başlatılamadı:', err.message));
+          }, delay);
+        }
       });
       
       serverStarted = true;
@@ -122,6 +134,7 @@ function startBackend() {
         const req = http.get('http://localhost:3000/api/health', { timeout: 200 }, (res) => {
           if (res.statusCode === 200) {
             clearInterval(checkBackend);
+            restartAttempts = 0;
             console.log('✅ Backend hazır! (http://localhost:3000)');
             console.log('=== BACKEND LOADER TAMAMLANDI ===\n');
             resolve();
@@ -148,11 +161,25 @@ function startBackend() {
 }
 
 function stopBackend() {
+  stopping = true;
   if (serverProcess) {
     console.log('🛑 Server process durduruluyor...');
-    serverProcess.kill('SIGTERM');
+    const proc = serverProcess;
     serverProcess = null;
     serverStarted = false;
+    try {
+      proc.kill('SIGTERM');
+    } catch (err) {
+      console.warn('Server process kapatılamadı:', err.message);
+    }
+    // Windows'ta SIGTERM her zaman işlenmez; kısa süre sonra zorla kapat
+    setTimeout(() => {
+      try {
+        if (!proc.killed && proc.exitCode === null) proc.kill('SIGKILL');
+      } catch {
+        /* yoksay */
+      }
+    }, 1500).unref();
   }
 }
 

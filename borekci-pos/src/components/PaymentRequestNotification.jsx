@@ -1,220 +1,111 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getSocket } from '../services/socket';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSocket } from '../contexts/SocketContext';
 import { getPaymentRequests } from '../services/api';
+import { formatCurrency } from '../utils/dateFormatter';
 
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 1000;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+    osc.onended = () => ctx.close().catch(() => {});
+  } catch {
+    /* ses desteklenmiyor */
+  }
+}
+
+/**
+ * Garson "Masayı hesaba yolla" dediğinde kasada (yönetici) çıkan uyarı.
+ * Aynı istek hem socket hem yedek sorgudan gelse bile id ile tekilleştirilir.
+ */
 const PaymentRequestNotification = ({ user }) => {
-  const [paymentRequest, setPaymentRequest] = useState(null);
-  const [isBlinking, setIsBlinking] = useState(false);
-  const blinkIntervalRef = useRef(null);
-  const soundIntervalRef = useRef(null);
+  const { socket, isConnected } = useSocket();
+  const [queue, setQueue] = useState([]);
+  const seenIdsRef = useRef(new Set());
+  const lastIdRef = useRef(0);
+  const soundTimerRef = useRef(null);
+  const isAdmin = user?.role === 'yönetici';
 
+  const pushRequest = useCallback((request) => {
+    if (!request?.tableId) return;
+    const key = request.id ?? `${request.tableId}-${request.createdAt}`;
+    if (seenIdsRef.current.has(key)) return;
+    seenIdsRef.current.add(key);
+    if (typeof request.id === 'number') lastIdRef.current = Math.max(lastIdRef.current, request.id);
+    setQueue((prev) => [...prev, request]);
+  }, []);
+
+  // Socket ile anlık bildirim
   useEffect(() => {
-    // Sadece yönetici kullanıcılar için bildirim göster
-    if (user?.role !== 'yönetici') {
-      return;
-    }
+    if (!isAdmin || !socket) return undefined;
+    const handler = (data) => pushRequest(data);
+    socket.on('tableRequestPayment', handler);
+    return () => socket.off('tableRequestPayment', handler);
+  }, [socket, isAdmin, pushRequest]);
 
-    let socket = null;
-    let isMounted = true;
-    let pollTimer = null;
-
-    const setupPaymentRequestListener = async () => {
-      try {
-        socket = await getSocket();
-        if (!socket) {
-          console.warn('⚠ Socket bağlantısı kurulamadı (PaymentRequestNotification)');
-          return;
-        }
-
-        // Socket bağlantısını bekle
-        if (!socket.connected) {
-          socket.once('connect', () => {
-            console.log('✅ Socket bağlandı (PaymentRequestNotification), listener ekleniyor...');
-            setupListener();
-          });
-        } else {
-          setupListener();
-        }
-
-        function setupListener() {
-          socket.on('tableRequestPayment', (data) => {
-            console.log('📢 Masa hesap isteği alındı (Global):', data);
-            if (!isMounted) return;
-
-            setPaymentRequest(data);
-            setIsBlinking(true);
-
-            // Yanıp sönme efekti
-            if (blinkIntervalRef.current) {
-              clearInterval(blinkIntervalRef.current);
-            }
-            blinkIntervalRef.current = setInterval(() => {
-              setIsBlinking(prev => !prev);
-            }, 500);
-
-            // Ses çalma (her 2 saniyede bir)
-            const playSound = () => {
-              try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-
-                // Dikkat çekici bir bip sesi
-                oscillator.frequency.value = 1000;
-                oscillator.type = 'sine';
-
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.2);
-              } catch (error) {
-                console.warn('Ses çalınamadı:', error);
-              }
-            };
-
-            // İlk sesi hemen çal
-            playSound();
-
-            // Her 2 saniyede bir ses çal
-            if (soundIntervalRef.current) {
-              clearInterval(soundIntervalRef.current);
-            }
-            soundIntervalRef.current = setInterval(() => {
-              playSound();
-            }, 2000);
-          });
-
-          console.log('✅ Masa hesap isteği listener eklendi (Global)');
-        }
-      } catch (error) {
-        console.error('❌ Socket listener kurulum hatası (PaymentRequestNotification):', error);
-      }
-    };
-
-    setupPaymentRequestListener();
-
-    // Fallback: 5 saniyede bir bekleyen hesap isteklerini poll et
+  // Socket kopuksa yedek sorgu (yalnızca bağlantı yokken çalışır)
+  useEffect(() => {
+    if (!isAdmin || isConnected) return undefined;
     const poll = async () => {
       try {
-        const response = await getPaymentRequests();
-        const items = response.data?.requests || [];
-        if (items.length > 0) {
-          const latest = items[items.length - 1];
-          setPaymentRequest(latest);
-          setIsBlinking(true);
-
-          if (blinkIntervalRef.current) clearInterval(blinkIntervalRef.current);
-          blinkIntervalRef.current = setInterval(() => setIsBlinking(prev => !prev), 500);
-
-          if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-          const playSound = () => {
-            try {
-              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-              const oscillator = audioContext.createOscillator();
-              const gainNode = audioContext.createGain();
-
-              oscillator.connect(gainNode);
-              gainNode.connect(audioContext.destination);
-
-              oscillator.frequency.value = 1000;
-              oscillator.type = 'sine';
-
-              gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-
-              oscillator.start(audioContext.currentTime);
-              oscillator.stop(audioContext.currentTime + 0.2);
-            } catch (error) {
-              console.warn('Ses çalınamadı (poll):', error);
-            }
-          };
-          playSound();
-          soundIntervalRef.current = setInterval(playSound, 2000);
-        }
-      } catch (err) {
-        // sessizce geç
+        const response = await getPaymentRequests(lastIdRef.current);
+        (response.data?.requests || []).forEach(pushRequest);
+      } catch {
+        /* sessiz */
       }
     };
-    pollTimer = setInterval(poll, 5000);
+    const timer = setInterval(poll, 5000);
+    return () => clearInterval(timer);
+  }, [isAdmin, isConnected, pushRequest]);
 
+  // Bekleyen istek varken ses
+  useEffect(() => {
+    if (queue.length === 0) {
+      if (soundTimerRef.current) clearInterval(soundTimerRef.current);
+      soundTimerRef.current = null;
+      return undefined;
+    }
+    playBeep();
+    soundTimerRef.current = setInterval(playBeep, 2500);
     return () => {
-      isMounted = false;
-      if (socket) {
-        socket.off('tableRequestPayment');
-      }
-      if (blinkIntervalRef.current) {
-        clearInterval(blinkIntervalRef.current);
-      }
-      if (soundIntervalRef.current) {
-        clearInterval(soundIntervalRef.current);
-      }
-      if (pollTimer) {
-        clearInterval(pollTimer);
-      }
+      if (soundTimerRef.current) clearInterval(soundTimerRef.current);
+      soundTimerRef.current = null;
     };
-  }, [user]);
+  }, [queue.length]);
 
-  // Bildirimi kapat
-  const handleClosePaymentRequest = () => {
-    setPaymentRequest(null);
-    setIsBlinking(false);
-    if (blinkIntervalRef.current) {
-      clearInterval(blinkIntervalRef.current);
-    }
-    if (soundIntervalRef.current) {
-      clearInterval(soundIntervalRef.current);
-    }
+  if (!isAdmin || queue.length === 0) return null;
+  const current = queue[0];
+  const dismiss = () => setQueue((prev) => prev.slice(1));
+  const accept = () => {
+    window.location.hash = `#/table/${current.tableId}`;
+    dismiss();
   };
-
-  // Hesabı Al butonuna basıldığında
-  const handleAcceptPaymentRequest = () => {
-    if (paymentRequest?.tableId) {
-      // Masa detay sayfasına yönlendir (HashRouter kullanıldığı için window.location.hash)
-      window.location.hash = `#/table/${paymentRequest.tableId}`;
-      handleClosePaymentRequest();
-    }
-  };
-
-  if (!paymentRequest || user?.role !== 'yönetici') {
-    return null;
-  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div
-        className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center transition-all duration-300 ${
-          isBlinking ? 'scale-105 ring-4 ring-orange-500' : 'scale-100'
-        }`}
-        style={{
-          animation: isBlinking ? 'pulse 0.5s ease-in-out infinite' : 'none'
-        }}
-      >
-        <div className="mb-6">
-          <div className="text-6xl mb-4">📢</div>
-          <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
-            {paymentRequest.tableName || `${paymentRequest.tableId} Numaralı Masa`}
-          </h2>
-          <p className="text-xl text-gray-600 dark:text-gray-300">
-            Hesap Ödemek İçin Kasaya Gelmektedir!
-          </p>
+    <div className="modal-backdrop z-[60]">
+      <div className="modal max-w-sm text-center animate-ring border-2 border-orange-500">
+        <div className="modal-body py-6">
+          <div className="text-5xl mb-3">📢</div>
+          <h2 className="text-2xl font-bold mb-1">{current.tableName || `Masa ${current.tableId}`}</h2>
+          <p className="text-gray-600 dark:text-gray-300">Hesap ödemek için kasaya geliyor</p>
+          {current.total > 0 && <p className="mt-2 text-xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(current.total)}</p>}
+          {current.requestedBy && <p className="mt-1 text-xs text-gray-500">İsteyen: {current.requestedBy}</p>}
+          {queue.length > 1 && <p className="mt-2 badge badge-amber">+{queue.length - 1} bekleyen istek</p>}
         </div>
-
-        <div className="flex gap-4">
-          <button
-            onClick={handleAcceptPaymentRequest}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-150 transform active:scale-95 text-lg"
-          >
-            Hesabı Al
-          </button>
-          <button
-            onClick={handleClosePaymentRequest}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg transition-all duration-150 transform active:scale-95 text-lg"
-          >
+        <div className="modal-footer">
+          <button type="button" onClick={dismiss} className="btn btn-secondary flex-1">
             Kapat
+          </button>
+          <button type="button" onClick={accept} className="btn btn-success flex-1" autoFocus>
+            Hesabı Al
           </button>
         </div>
       </div>
@@ -223,4 +114,3 @@ const PaymentRequestNotification = ({ user }) => {
 };
 
 export default PaymentRequestNotification;
-

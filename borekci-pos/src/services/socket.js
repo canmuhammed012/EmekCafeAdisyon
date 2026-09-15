@@ -1,18 +1,9 @@
-// Socket.io client singleton - tek bir instance
+// Socket.io istemcisi — tek bağlantı, oturum token'ı ile doğrulanır
 import { io } from 'socket.io-client';
+import { getServerBaseUrl, getAuthToken, AUTH_EXPIRED_EVENT } from './api';
 
 let socketInstance = null;
-let isConnecting = false;
 let currentServerUrl = null;
-
-// Backend URL'i belirle
-function getServerUrl() {
-  const serverIP = localStorage.getItem('serverIP');
-  if (serverIP) {
-    return `http://${serverIP}:3000`;
-  }
-  return 'http://localhost:3000';
-}
 
 export function disconnectSocket() {
   if (socketInstance) {
@@ -20,7 +11,6 @@ export function disconnectSocket() {
     socketInstance.disconnect();
     socketInstance = null;
   }
-  isConnecting = false;
   currentServerUrl = null;
 }
 
@@ -29,36 +19,27 @@ export function resetSocket() {
   disconnectSocket();
 }
 
-export async function getSocket() {
-  const serverUrl = getServerUrl();
+/**
+ * Socket örneğini döndürür. Bağlantı henüz kurulmamış olsa bile örnek hemen döner;
+ * socket.io bağlanmadan önce eklenen dinleyicileri de korur.
+ */
+export function getSocket() {
+  const serverUrl = getServerBaseUrl();
+  const token = getAuthToken();
 
-  // Admin IP değiştiyse eski bağlantıyı kapat
-  if (socketInstance && currentServerUrl && currentServerUrl !== serverUrl) {
+  if (socketInstance && currentServerUrl !== serverUrl) {
     disconnectSocket();
   }
-
-  if (socketInstance && socketInstance.connected) {
+  if (socketInstance) {
     return socketInstance;
   }
-
-  if (isConnecting) {
-    return new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (socketInstance && socketInstance.connected) {
-          clearInterval(checkInterval);
-          resolve(socketInstance);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkInterval), 30000);
-    });
+  if (!token) {
+    return null;
   }
 
-  isConnecting = true;
   currentServerUrl = serverUrl;
-
-  console.log('📡 Socket bağlantısı başlatılıyor:', serverUrl);
-
   socketInstance = io(serverUrl, {
+    auth: { token },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
@@ -68,18 +49,20 @@ export async function getSocket() {
   });
 
   socketInstance.on('connect', () => {
-    console.log('✅ Socket bağlandı:', socketInstance.id, '→', serverUrl);
-    isConnecting = false;
+    console.log('✅ Socket bağlandı →', serverUrl);
   });
-
   socketInstance.on('disconnect', (reason) => {
-    console.log('❌ Socket bağlantısı kesildi:', reason, '→', serverUrl);
-    isConnecting = false;
+    console.log('❌ Socket bağlantısı kesildi:', reason);
   });
-
   socketInstance.on('connect_error', (error) => {
-    console.error('❌ Socket bağlantı hatası:', error.message, '→', serverUrl);
-    isConnecting = false;
+    if (error?.message === 'unauthorized') {
+      console.warn('Socket: oturum geçersiz, çıkış yapılıyor');
+      disconnectSocket();
+      localStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      return;
+    }
+    console.warn('Socket bağlantı hatası:', error?.message);
   });
 
   return socketInstance;

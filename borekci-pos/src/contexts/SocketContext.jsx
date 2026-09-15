@@ -1,72 +1,34 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getSocket } from '../services/socket';
+import { getServerBaseUrl } from '../services/api';
 
-const SocketContext = createContext();
+const SocketContext = createContext({ socket: null, isConnected: false, serverUrl: '' });
 
-export const useSocket = () => {
-  const context = useContext(SocketContext);
-  if (!context) {
-    throw new Error('useSocket must be used within SocketProvider');
-  }
-  return context;
-};
+export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    const instance = getSocket();
+    if (!instance) return undefined;
 
-    const initSocket = async () => {
-      try {
-        const socketInstance = await getSocket();
-        
-        if (!mounted) return;
+    setSocket(instance);
+    setIsConnected(instance.connected);
 
-        setSocket(socketInstance);
-        setIsConnected(socketInstance.connected);
-
-        socketInstance.on('connect', () => {
-          if (mounted) {
-            setIsConnected(true);
-            console.log('✅ Socket context - bağlantı kuruldu');
-          }
-        });
-
-        socketInstance.on('disconnect', () => {
-          if (mounted) {
-            setIsConnected(false);
-            console.log('❌ Socket context - bağlantı kesildi');
-          }
-        });
-      } catch (error) {
-        console.error('❌ Socket başlatılamadı:', error);
-        if (mounted) {
-          setIsConnected(false);
-        }
-      }
-    };
-
-    initSocket();
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+    instance.on('connect', onConnect);
+    instance.on('disconnect', onDisconnect);
 
     return () => {
-      mounted = false;
+      instance.off('connect', onConnect);
+      instance.off('disconnect', onDisconnect);
     };
   }, []);
 
-  const contextValue = useMemo(() => ({
-    socket,
-    isConnected,
-    serverUrl: localStorage.getItem('serverIP')
-      ? `http://${localStorage.getItem('serverIP')}:3000`
-      : 'http://localhost:3000',
-  }), [socket, isConnected]);
+  const value = useMemo(() => ({ socket, isConnected, serverUrl: getServerBaseUrl() }), [socket, isConnected]);
 
-  return (
-    <SocketContext.Provider value={contextValue}>
-      {children}
-    </SocketContext.Provider>
-  );
+  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
 };
-

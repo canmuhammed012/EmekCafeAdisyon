@@ -1,91 +1,64 @@
 const STORAGE_KEY = 'exchange_rates';
 const STORAGE_TIMESTAMP_KEY = 'exchange_rates_timestamp';
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 saat
+const FETCH_TIMEOUT_MS = 5000;
+const FALLBACK_RATES = { USD: 34.5, EUR: 37.5 };
+
+/** Kur bilgisini fiyatlandırmada kullanılan indirim (₺) */
+export const RATE_DISCOUNT = 2;
 
 /**
- * Güncel döviz kurlarını al (TCMB veya alternatif API)
- * @returns {Promise<{USD: number, EUR: number}>}
+ * Güncel döviz kurlarını al. İnternet yoksa kayıtlı/varsayılan kurlara düşer.
+ * @returns {Promise<{USD: number, EUR: number, source: 'live'|'cache'|'fallback'}>}
  */
 export async function getExchangeRates() {
+  const saved = getSavedExchangeRates();
+  const lastUpdate = getLastUpdateTime();
+  if (saved && lastUpdate && Date.now() - lastUpdate.getTime() < CACHE_TTL_MS) {
+    return { ...saved, source: 'cache' };
+  }
+
   try {
-    // exchangerate-api.com ücretsiz servisi
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/TRY');
+    const response = await fetch('https://api.exchangerate-api.com/v4/latest/TRY', {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    
-    // TRY bazlı olduğu için USD ve EUR'yu TRY'ye çevirmemiz gerekiyor
-    // API TRY -> USD/EUR oranını veriyor, biz USD/EUR -> TRY istiyoruz
-    const usdRate = 1 / data.rates.USD;
-    const eurRate = 1 / data.rates.EUR;
-    
-    const rates = {
-      USD: usdRate,
-      EUR: eurRate
-    };
-    
-    // Başarılı çekildiğinde localStorage'a kaydet
+    const usd = Number(data?.rates?.USD);
+    const eur = Number(data?.rates?.EUR);
+    if (!usd || !eur) throw new Error('Kur verisi eksik');
+
+    const rates = { USD: 1 / usd, EUR: 1 / eur };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rates));
     localStorage.setItem(STORAGE_TIMESTAMP_KEY, Date.now().toString());
-    console.log('✓ Döviz kurları güncellendi:', rates);
-    
-    return rates;
+    return { ...rates, source: 'live' };
   } catch (error) {
-    console.error('✗ Döviz kurları alınamadı:', error);
-    
-    // Önce localStorage'dan yüklemeyi dene
-    const savedRates = getSavedExchangeRates();
-    if (savedRates) {
-      console.log('⚠ Kaydedilmiş kurlar kullanılıyor:', savedRates);
-      return savedRates;
-    }
-    
-    // localStorage'da da yoksa fallback değerler
-    console.log('⚠ Varsayılan kurlar kullanılıyor');
-    return {
-      USD: 34.50,
-      EUR: 37.50
-    };
+    if (saved) return { ...saved, source: 'cache' };
+    return { ...FALLBACK_RATES, source: 'fallback' };
   }
 }
 
-/**
- * localStorage'dan kaydedilmiş döviz kurlarını al
- * @returns {{USD: number, EUR: number} | null}
- */
 export function getSavedExchangeRates() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (parsed?.USD > 0 && parsed?.EUR > 0) return { USD: parsed.USD, EUR: parsed.EUR };
     }
-  } catch (error) {
-    console.error('Kaydedilmiş kurlar okunamadı:', error);
+  } catch {
+    /* yoksay */
   }
   return null;
 }
 
-/**
- * Son güncelleme zamanını al
- * @returns {Date | null}
- */
 export function getLastUpdateTime() {
-  try {
-    const timestamp = localStorage.getItem(STORAGE_TIMESTAMP_KEY);
-    if (timestamp) {
-      return new Date(parseInt(timestamp));
-    }
-  } catch (error) {
-    console.error('Güncelleme zamanı okunamadı:', error);
-  }
-  return null;
+  const timestamp = Number(localStorage.getItem(STORAGE_TIMESTAMP_KEY));
+  return timestamp ? new Date(timestamp) : null;
 }
 
-/**
- * Toplam tutarı belirtilen kurdan 2 TL düşük kurla dönüştür
- * @param {number} amount - TL cinsinden tutar
- * @param {number} rate - Güncel kur
- * @returns {number} - Dönüştürülmüş tutar
- */
+/** Tutarı, kurdan RATE_DISCOUNT ₺ düşülmüş kurla dövize çevir */
 export function convertWithDiscount(amount, rate) {
-  const discountedRate = rate - 2; // 2 TL düşük kur
-  return amount / discountedRate;
+  const discountedRate = Number(rate) - RATE_DISCOUNT;
+  if (!Number.isFinite(discountedRate) || discountedRate <= 0) return 0;
+  return Number(amount) / discountedRate;
 }
-

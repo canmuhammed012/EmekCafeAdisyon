@@ -1,43 +1,60 @@
-// Türkiye saati için (GMT+3) tarih formatlaması
+// Sunucu (SQLite) zaman damgalarını Türkiye saatinde göstermek için yardımcılar.
+// SQLite CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS" biçiminde UTC üretir; JS bu biçimi
+// yerel saat sanır. Bu yüzden önce UTC olarak ayrıştırıp Europe/Istanbul'a çeviriyoruz.
 
-/**
- * UTC tarihini Türkiye saatine (GMT+3) çevirir
- * @param {string} utcDateString - UTC tarih string'i
- * @returns {Date} - GMT+3 için ayarlanmış Date objesi
- */
-export const convertToTurkeyTime = (utcDateString) => {
-  const date = new Date(utcDateString);
-  // 3 saat ekle (Türkiye GMT+3)
-  date.setHours(date.getHours() + 3);
-  return date;
+const TZ = 'Europe/Istanbul';
+
+export const parseServerDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const str = String(value).trim();
+  // "2025-01-01 12:30:00" → UTC
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+    return new Date(str.replace(' ', 'T') + 'Z');
+  }
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/**
- * UTC tarihini Türkiye formatında tarih string'ine çevirir
- * @param {string} utcDateString - UTC tarih string'i
- * @returns {string} - "DD.MM.YYYY" formatında tarih
- */
-export const formatDateTR = (utcDateString) => {
-  const date = convertToTurkeyTime(utcDateString);
-  return date.toLocaleDateString('tr-TR');
+export const formatDateTR = (value) => {
+  const date = parseServerDate(value);
+  if (!date) return '';
+  return date.toLocaleDateString('tr-TR', { timeZone: TZ });
 };
 
-/**
- * UTC tarihini Türkiye formatında saat string'ine çevirir
- * @param {string} utcDateString - UTC tarih string'i
- * @returns {string} - "HH:MM" formatında saat
- */
-export const formatTimeTR = (utcDateString) => {
-  const date = convertToTurkeyTime(utcDateString);
-  return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+export const formatTimeTR = (value) => {
+  const date = parseServerDate(value);
+  if (!date) return '';
+  return date.toLocaleTimeString('tr-TR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
 };
 
-/**
- * UTC tarihini Türkiye formatında tarih ve saat string'ine çevirir
- * @param {string} utcDateString - UTC tarih string'i
- * @returns {string} - "DD.MM.YYYY HH:MM" formatında tarih-saat
- */
-export const formatDateTimeTR = (utcDateString) => {
-  return `${formatDateTR(utcDateString)} ${formatTimeTR(utcDateString)}`;
+export const formatDateTimeTR = (value) => {
+  const d = formatDateTR(value);
+  const t = formatTimeTR(value);
+  return d && t ? `${d} ${t}` : d || t;
 };
 
+/** Bugünün tarihi (Türkiye saati) — "YYYY-MM-DD" */
+export const todayISO = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+};
+
+/** Para biçimi: 1.234,50 ₺ */
+export const formatCurrency = (value) => {
+  const n = Number(value) || 0;
+  return `${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+};
+
+/** Geçen süre: "5 dk", "1 sa 12 dk" */
+export const formatElapsed = (value) => {
+  const date = parseServerDate(value);
+  if (!date) return '';
+  const mins = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (mins < 1) return 'şimdi';
+  if (mins < 60) return `${mins} dk`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m ? `${h} sa ${m} dk` : `${h} sa`;
+};

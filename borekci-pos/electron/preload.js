@@ -1,29 +1,32 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Electron API'lerini güvenli bir şekilde renderer process'e aç
+// Renderer'a yalnızca ihtiyaç duyulan kanallar açılır (rastgele IPC erişimi yok)
+const SEND_CHANNELS = new Set(['install-update', 'set-background-color']);
+const RECEIVE_CHANNELS = new Set(['update-available', 'download-progress', 'update-downloaded', 'update-error']);
+
 contextBridge.exposeInMainWorld('electron', {
-  // IPC Communication
   ipcRenderer: {
     send: (channel, data) => {
-      ipcRenderer.send(channel, data);
+      if (SEND_CHANNELS.has(channel)) ipcRenderer.send(channel, data);
     },
     on: (channel, func) => {
-      ipcRenderer.on(channel, (event, ...args) => func(event, ...args));
+      if (!RECEIVE_CHANNELS.has(channel)) return () => {};
+      const listener = (event, ...args) => func(event, ...args);
+      ipcRenderer.on(channel, listener);
+      return () => ipcRenderer.removeListener(channel, listener);
     },
     removeAllListeners: (channel) => {
-      ipcRenderer.removeAllListeners(channel);
-    }
+      if (RECEIVE_CHANNELS.has(channel)) ipcRenderer.removeAllListeners(channel);
+    },
   },
-  
-  // App version
-  getVersion: () => {
-    return ipcRenderer.sendSync('get-version');
-  },
+
+  getVersion: () => ipcRenderer.sendSync('get-version'),
+  setBackgroundColor: (color) => ipcRenderer.send('set-background-color', color),
 
   getDeviceRole: () => ipcRenderer.invoke('get-device-role'),
   setDeviceRole: (role) => ipcRenderer.invoke('set-device-role', role),
+  relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
 
   listLocalPrinters: () => ipcRenderer.invoke('list-local-printers'),
   printReceiptLocal: (payload) => ipcRenderer.invoke('print-receipt-local', payload),
 });
-

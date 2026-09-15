@@ -6,7 +6,12 @@ module.exports = {
   ],
   darkMode: 'class',
   theme: {
-    extend: {},
+    extend: {
+      screens: {
+        // Dokunmatik cihazlarda (parmakla kullanım) daha büyük hedefler için: touch:h-12 gibi
+        touch: { raw: '(pointer: coarse)' },
+      },
+    },
   },
   plugins: [],
 }

@@ -1,6 +1,6 @@
 {
   "name": "emek-cafe-adisyon",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -31,8 +31,6 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "electron-updater": "^6.6.2",
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-usb": "^3.0.0-alpha.4",
     "express": "^5.1.0",
     "iconv-lite": "^0.7.2",
     "react": "^19.2.0",
@@ -42,7 +40,6 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.7",
-    "usb": "^2.12.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -67,9 +64,7 @@
     "forceCodeSigning": false,
     "asar": true,
     "asarUnpack": [
-      "**/node_modules/sqlite3/**/*",
-      "**/node_modules/usb/**/*",
-      "**/node_modules/escpos-usb/**/*"
+      "**/node_modules/sqlite3/**/*"
     ],
     "files": [
       "dist/**/*",
@@ -106,6 +101,13 @@
       {
         "from": "print-raw.ps1",
         "to": "print-raw.ps1"
+      },
+      {
+        "from": "dist",
+        "to": "dist",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

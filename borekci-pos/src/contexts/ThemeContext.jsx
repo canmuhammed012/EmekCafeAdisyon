@@ -1,48 +1,32 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 
-const ThemeContext = createContext();
+const ThemeContext = createContext({ darkMode: false, toggleTheme: () => {} });
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
-};
+export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
   const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
+    try {
+      return localStorage.getItem('darkMode') === 'true';
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    document.documentElement.classList.toggle('dark', darkMode);
+    document.documentElement.style.colorScheme = darkMode ? 'dark' : 'light';
+    try {
+      localStorage.setItem('darkMode', String(darkMode));
+    } catch {
+      /* yoksay */
     }
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    
-    // Electron penceresinin çerçeve rengini güncelle
-    if (window.electron && window.electron.setBackgroundColor) {
-      window.electron.setBackgroundColor(darkMode ? '#1f2937' : '#ffffff');
-    }
+    // Electron pencere arka planını temaya uydur (beyaz parlama olmasın)
+    window.electron?.setBackgroundColor?.(darkMode ? '#111827' : '#f3f4f6');
   }, [darkMode]);
 
-  const toggleTheme = useCallback(() => {
-    setDarkMode(prev => !prev);
-  }, []);
+  const toggleTheme = useCallback(() => setDarkMode((prev) => !prev), []);
+  const value = useMemo(() => ({ darkMode, toggleTheme }), [darkMode, toggleTheme]);
 
-  const value = useMemo(() => ({
-    darkMode,
-    toggleTheme
-  }), [darkMode, toggleTheme]);
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
-

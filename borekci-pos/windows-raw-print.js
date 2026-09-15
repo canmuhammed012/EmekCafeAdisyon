@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, execFileSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const THERMAL_PRINTER_PATTERNS = [
   'xp-90', 'xp90', 'xp-9000', 'xp9000', 'xp-80', 'xp80',
@@ -22,12 +22,18 @@ function getPrintScriptPath() {
 }
 
 function listWindowsPrinters() {
-  const output = execSync(
-    'powershell -NoProfile -Command "Get-Printer | Select-Object Name, PrinterStatus | ConvertTo-Json -Compress"',
-    { encoding: 'utf-8', timeout: 8000, shell: true }
+  const output = execFileSync(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', 'Get-Printer | Select-Object Name, PrinterStatus | ConvertTo-Json -Compress'],
+    { encoding: 'utf-8', timeout: 8000, windowsHide: true }
   );
 
-  let parsed = JSON.parse(output || '[]');
+  let parsed = [];
+  try {
+    parsed = JSON.parse((output || '').trim() || '[]');
+  } catch {
+    parsed = [];
+  }
   if (!Array.isArray(parsed)) {
     parsed = [parsed];
   }
@@ -67,7 +73,9 @@ function matchPrinter(printers, requestedName) {
     if (hit) return hit;
   }
 
-  return printers[0];
+  // Termal yazıcı tespit edilemedi: ofis yazıcısına ham ESC/POS gönderip
+  // sayfalarca anlamsız çıktı üretmemek için hiçbir yazıcıyı seçme.
+  return null;
 }
 
 /** Türkçe karakterleri ASCII'ye çevir (termal yazıcı uyumu) */
