@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electron', {
   getDeviceRole: () => ipcRenderer.invoke('get-device-role'),
   setDeviceRole: (role) => ipcRenderer.invoke('set-device-role', role),
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
+  getPerformanceMode: () => ipcRenderer.invoke('get-performance-mode'),
+  setPerformanceMode: (enabled) => ipcRenderer.invoke('set-performance-mode', enabled),
 
   listLocalPrinters: () => ipcRenderer.invoke('list-local-printers'),
   printReceiptLocal: (payload) => ipcRenderer.invoke('print-receipt-local', payload),

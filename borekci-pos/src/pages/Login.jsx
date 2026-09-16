@@ -82,6 +82,18 @@ const Login = ({ onLogin }) => {
   const [editingIP, setEditingIP] = useState(false);
   const [deviceRole, setDeviceRole] = useState(localStorage.getItem('deviceRole') || 'server');
   const [roleChanged, setRoleChanged] = useState(false);
+  const [lowPerf, setLowPerf] = useState(() => localStorage.getItem('lowPerformance') === 'true');
+  const [perfChanged, setPerfChanged] = useState(false);
+
+  const applyLowPerf = async (enabled) => {
+    setLowPerf(enabled);
+    localStorage.setItem('lowPerformance', String(enabled));
+    document.documentElement.classList.toggle('reduce-motion', enabled);
+    if (window.electron?.setPerformanceMode) {
+      await window.electron.setPerformanceMode(enabled);
+      setPerfChanged(true);
+    }
+  };
   const [serverStatus, setServerStatus] = useState({ state: 'idle', message: '' }); // idle | searching | ok | error
   const [scanProgress, setScanProgress] = useState(0);
   const [deviceIP, setDeviceIP] = useState('');
@@ -286,6 +298,23 @@ const Login = ({ onLogin }) => {
               {roleChanged && (
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                   <span>Rol değişikliği için uygulamayı yeniden başlatın.</span>
+                  {window.electron?.relaunchApp && (
+                    <button type="button" onClick={() => window.electron.relaunchApp()} className="btn btn-sm btn-warning">
+                      Yeniden başlat
+                    </button>
+                  )}
+                </div>
+              )}
+              <label className="mt-2 flex items-start gap-2 text-sm cursor-pointer select-none">
+                <input type="checkbox" className="mt-1 h-5 w-5 accent-blue-600" checked={lowPerf} onChange={(e) => applyLowPerf(e.target.checked)} />
+                <span>
+                  <span className="font-medium">🐢 Zayıf bilgisayar modu</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">Animasyon ve gölgeleri kapatır, donanım hızlandırmayı devre dışı bırakır. Eski/yavaş cihazlarda takılmayı azaltır.</span>
+                </span>
+              </label>
+              {perfChanged && (
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  <span>Donanım ayarı yeniden başlatmada etkin olur.</span>
                   {window.electron?.relaunchApp && (
                     <button type="button" onClick={() => window.electron.relaunchApp()} className="btn btn-sm btn-warning">
                       Yeniden başlat

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SocketProvider } from './contexts/SocketContext';
@@ -12,7 +12,9 @@ import Screensaver from './components/Screensaver';
 import Login from './pages/Login';
 import Tables from './pages/Tables';
 import TableDetail from './pages/TableDetail';
-import Admin from './pages/Admin';
+// Yönetim paneli (grafik + Excel kütüphaneleri) yalnızca gerektiğinde yüklenir;
+// garson cihazları bu ~600 KB'lık kodu hiç indirmez/çözümlemez.
+const Admin = lazy(() => import('./pages/Admin'));
 import './index.css';
 
 function App() {
@@ -22,6 +24,16 @@ function App() {
     return saved?.token ? saved : null;
   });
   const [showScreensaver, setShowScreensaver] = useState(false);
+
+  // Zayıf bilgisayar modu: animasyon/gölge/geçişleri kapat (giriş ekranından açılır)
+  useEffect(() => {
+    const apply = (on) => document.documentElement.classList.toggle('reduce-motion', Boolean(on));
+    apply(localStorage.getItem('lowPerformance') === 'true');
+    window.electron?.getPerformanceMode?.().then((on) => {
+      localStorage.setItem('lowPerformance', String(Boolean(on)));
+      apply(on);
+    }).catch(() => {});
+  }, []);
 
   const handleLogin = useCallback((userData) => {
     localStorage.setItem('user', JSON.stringify(userData));
@@ -80,7 +92,9 @@ function App() {
           path="/admin"
           element={
             user?.role === 'yönetici' ? (
-              <Admin user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} />
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-500">Yönetim paneli yükleniyor…</div>}>
+                <Admin user={user} onLogout={handleLogout} onOpenScreensaver={openScreensaver} />
+              </Suspense>
             ) : (
               <Navigate to={user ? '/' : '/login'} replace />
             )

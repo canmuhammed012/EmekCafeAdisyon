@@ -10,6 +10,19 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(APP_ID);
 }
 
+// Zayıf bilgisayar modu: donanım hızlandırmayı kapat (bazı eski ekran kartlarında takılmayı önler)
+// app.whenReady'den ÖNCE çağrılmalı.
+try {
+  const earlyConfig = readDeviceConfig();
+  if (earlyConfig.lowPerformance === true) {
+    app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch('disable-gpu-compositing');
+    console.log('⚙️ Zayıf bilgisayar modu: donanım hızlandırma kapalı');
+  }
+} catch {
+  /* yoksay */
+}
+
 // Tek instance kontrolü
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -219,6 +232,14 @@ ipcMain.handle('set-device-role', (_event, role) => {
   return { ok: true, restartRequired: true };
 });
 
+ipcMain.handle('get-performance-mode', () => readDeviceConfig().lowPerformance === true);
+
+ipcMain.handle('set-performance-mode', (_event, enabled) => {
+  writeDeviceConfig({ ...readDeviceConfig(), lowPerformance: enabled === true });
+  console.log(`⚙️ Zayıf bilgisayar modu: ${enabled ? 'açık' : 'kapalı'} (yeniden başlatma gerekir)`);
+  return { ok: true, restartRequired: true };
+});
+
 ipcMain.handle('relaunch-app', () => {
   app.relaunch();
   app.exit(0);
@@ -288,7 +309,8 @@ ipcMain.on('get-version', (event) => {
 });
 
 ipcMain.on('install-update', () => {
-  autoUpdater.quitAndInstall(false, true);
+  // isSilent=true: kurulum sihirbazı açılmaz, ek onay istenmez; isForceRunAfter=true: kurulumdan sonra uygulama açılır
+  autoUpdater.quitAndInstall(true, true);
 });
 
 // ---------------------------------------------------------------------------
