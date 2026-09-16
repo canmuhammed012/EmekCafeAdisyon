@@ -1,11 +1,11 @@
-; NSIS Installer Script - Windows ile başlat ayarları
-; Masaüstü ve Başlat menüsü kısayollarını electron-builder kendisi oluşturur
-; (uygulama kimliği/AppUserModelID ve simge ile). Burada yalnızca otomatik başlatma eklenir.
+; NSIS Installer Script - Windows ile baslat ayarlari
+; Masaustu ve Baslat menusu kisayollarini electron-builder kendisi olusturur
+; (uygulama kimligi/AppUserModelID ve simge ile). Burada yalnizca otomatik baslatma eklenir.
 
 !macro customInstall
-  ; Windows açılışında otomatik başlat (kısayol + kayıt defteri)
-  IfFileExists "$INSTDIResources\logo.ico" 0 UseExeIconStartup
-    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIResources\logo.ico" 0
+  ; Windows acilisinda otomatik baslat (kisayol + kayit defteri)
+  IfFileExists "$INSTDIR\resources\logo.ico" 0 UseExeIconStartup
+    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\resources\logo.ico" 0
     Goto StartupDone
   UseExeIconStartup:
     CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0
