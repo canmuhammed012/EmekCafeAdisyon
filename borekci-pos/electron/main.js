@@ -169,6 +169,11 @@ function createWindow() {
       startBackend().catch((err) => console.error('Backend başlatma hatası:', err));
     }
 
+    // Görev çubuğu simgesi: sayfa yüklendikten sonra tekrar ayarla (bazı Windows sürümlerinde ilk ayar tutmuyor)
+    mainWindow.webContents.on('did-finish-load', () => {
+      if (process.platform === 'win32' && iconPath && mainWindow && !mainWindow.isDestroyed()) mainWindow.setIcon(iconPath);
+    });
+
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
       console.error('❌ Sayfa yükleme hatası:', errorCode, errorDescription, validatedURL);
     });

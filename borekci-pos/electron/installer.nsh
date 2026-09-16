@@ -1,42 +1,19 @@
-; NSIS Installer Script - Startup ve Registry ayarları
-; Electron Builder custom install/uninstall macros
+; NSIS Installer Script - Windows ile başlat ayarları
+; Masaüstü ve Başlat menüsü kısayollarını electron-builder kendisi oluşturur
+; (uygulama kimliği/AppUserModelID ve simge ile). Burada yalnızca otomatik başlatma eklenir.
 
-; Kurulum sonrası custom install macro
 !macro customInstall
-  ; Icon dosyası yolu (extraResources ile kopyalanan logo.ico)
-  ; Electron Builder extraResources dosyalarını $INSTDIR\resources klasörüne kopyalar
-  ; Masaüstü kısayolu oluştur (icon ile)
-  ; CreateShortCut syntax: "link.lnk" "target.exe" "parameters" "icon.ico" icon_index
-  ; Önce logo.ico'yu kontrol et, yoksa .exe'yi kullan
-  IfFileExists "$INSTDIR\resources\logo.ico" 0 UseExeIcon
-    ; Icon dosyası var, onu kullan
-    CreateShortCut "$DESKTOP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\resources\logo.ico" 0
-    Goto IconDone
-  UseExeIcon:
-    ; Icon dosyası yok, .exe dosyasının kendisini kullan
-    CreateShortCut "$DESKTOP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0
-  IconDone:
-  
-  ; Startup klasörüne kısayol ekle (icon ile)
-  IfFileExists "$INSTDIR\resources\logo.ico" 0 UseExeIconStartup
-    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\resources\logo.ico" 0
+  ; Windows açılışında otomatik başlat (kısayol + kayıt defteri)
+  IfFileExists "$INSTDIResources\logo.ico" 0 UseExeIconStartup
+    CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIResources\logo.ico" 0
     Goto StartupDone
   UseExeIconStartup:
     CreateShortCut "$SMSTARTUP\Emek Cafe Adisyon.lnk" "$INSTDIR\Emek Cafe Adisyon.exe" "" "$INSTDIR\Emek Cafe Adisyon.exe" 0
   StartupDone:
-  
-  ; Registry'ye startup entry ekle (daha güvenilir)
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Emek Cafe Adisyon" "$INSTDIR\Emek Cafe Adisyon.exe"
 !macroend
 
-; Kaldırma işlemi için custom uninstall macro
 !macro customUnInstall
-  ; Masaüstü kısayolunu sil
-  Delete "$DESKTOP\Emek Cafe Adisyon.lnk"
-  
-  ; Startup klasöründen kısayolu sil
   Delete "$SMSTARTUP\Emek Cafe Adisyon.lnk"
-  
-  ; Registry'den startup entry'yi sil
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Emek Cafe Adisyon"
 !macroend

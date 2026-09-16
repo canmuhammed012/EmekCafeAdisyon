@@ -1,3 +1,4 @@
+v2.3.4 - Görev çubuğunda Electron simgesi görünme sorunu: simge dosyası çok boyutlu (16-256 px) yapıldı, masaüstü kısayolu düzeltildi
 v2.3.3 - Ayarlar > Ağ bilgisi: Windows Güvenlik Duvarı izni durumu ve tek tıkla "İzin ver" düğmesi (uyarıda İptal denmişse garson cihazlarının bağlanamamasını düzeltir)
 v2.3.2 - Güncelleme "Şimdi yükle" sonrası sessiz kurulur, ek onay/sihirbaz çıkmaz; Zayıf bilgisayar modu (giriş ekranı: animasyonlar kapanır, donanım hızlandırma devre dışı); Yönetim paneli kodu (grafik/Excel) yalnızca yöneticide yüklenir, garson cihazı daha hızlı açılır; ağır animasyon ve bulanıklık efektleri kaldırıldı
 v2.3.1 - Hızlı arka arkaya ürün tıklamalarında bazı tıklamalar işlenmiyordu, artık hepsi sırayla eklenir; Sıralamayı kaydederken "cannot start a transaction within a transaction" hatası düzeltildi
