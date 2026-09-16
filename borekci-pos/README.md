@@ -25,6 +25,11 @@ Restoran POS (Point of Sale) yazılımı - Electron tabanlı masaüstü uygulama
 - Safari'de **Paylaş → Ana Ekrana Ekle** ile uygulama simgesi gibi açılır; App Store gerekmez.
 - Masa açma, sipariş ekleme, hesap kapatma ve "Hesaba Yolla" telefonda da çalışır; fiş yazdırma yalnızca yazıcı bağlı cihazlardan yapılır.
 
+## Windows Güvenlik Duvarı
+
+- Kasa uygulaması ilk açılışta Windows'tan "bu uygulamanın bazı özelliklerini engelledi" uyarısı alır; **İzin ver** seçilmelidir (özel ağlar işaretli).
+- İptal denmişse **Yönetim → Ayarlar → Ağ bilgisi → İzin ver** ile yönetici onayı verilerek kural eklenir; aksi hâlde garson cihazları ve telefonlar kasaya bağlanamaz.
+
 ## Günlük Görevler
 
 - Üst çubuktaki **🎯 Günlük Görevler** ile ürün başına günlük satış kotası tanımlanır (yönetici) ve herkes tarafından takip edilir.

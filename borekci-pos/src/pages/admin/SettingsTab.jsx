@@ -7,6 +7,26 @@ const SettingsTab = ({ showAlert }) => {
   const [serverPrinters, setServerPrinters] = useState([]);
   const [localPrinters, setLocalPrinters] = useState([]);
   const [serverInfo, setServerInfo] = useState(null);
+  const [firewall, setFirewall] = useState(null); // { supported, exists, ok }
+  const [fwBusy, setFwBusy] = useState(false);
+
+  const refreshFirewall = useCallback(() => {
+    if (!window.electron?.getFirewallStatus) return;
+    window.electron.getFirewallStatus().then(setFirewall).catch(() => setFirewall(null));
+  }, []);
+
+  const allowFirewall = async () => {
+    if (!window.electron?.allowFirewall) return;
+    setFwBusy(true);
+    try {
+      const result = await window.electron.allowFirewall();
+      if (result?.status) setFirewall(result.status);
+      if (result?.ok) showAlert('Tamam', 'Güvenlik duvarı izni eklendi. Garson cihazları ve telefonlar artık kasaya bağlanabilir.', 'success');
+      else showAlert('Eklenemedi', result?.error || 'İzin eklenemedi', 'warning');
+    } finally {
+      setFwBusy(false);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
 
@@ -34,7 +54,8 @@ const SettingsTab = ({ showAlert }) => {
 
   useEffect(() => {
     load();
-  }, [load]);
+    refreshFirewall();
+  }, [load, refreshFirewall]);
 
   const save = async (key, value) => {
     setBusy(key);
@@ -95,6 +116,28 @@ const SettingsTab = ({ showAlert }) => {
               <span className={`badge ${serverInfo.isPrimaryServer ? 'badge-green' : 'badge-amber'}`}>{serverInfo.isPrimaryServer ? 'Kasa sunucusu' : 'İstemci'}</span>
             </div>
             <p className="text-xs text-gray-500">Garson cihazlarında IP genellikle otomatik bulunur; bulunamazsa giriş ekranında "IP gir" ile bu adresi yazın. Kasa bilgisayarının IP'si değişirse (modem yeniden başlatma) garsonlar tekrar otomatik arar.</p>
+            {firewall?.supported && serverInfo.isPrimaryServer && (
+              <div className={`mt-2 rounded-xl border px-3 py-2.5 text-sm ${firewall.ok ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20' : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20'}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold">{firewall.ok ? '🛡️ Windows Güvenlik Duvarı izni var' : '⚠️ Windows Güvenlik Duvarı izni bulunamadı'}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-300">
+                      {firewall.ok
+                        ? 'Diğer cihazlar kasaya bağlanabilir.'
+                        : 'Windows "bu uygulamanın bazı özelliklerini engelledi" uyarısında İptal denmişse garsonlar bağlanamaz. Düğme yönetici onayı (UAC) ister ve izni ekler.'}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" className="btn btn-sm btn-secondary" onClick={refreshFirewall} title="Durumu yenile">↻</button>
+                    {!firewall.ok && (
+                      <button type="button" className="btn btn-sm btn-warning" onClick={allowFirewall} disabled={fwBusy}>
+                        {fwBusy ? 'Ekleniyor…' : '🛡️ İzin ver'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-sm text-gray-500">Sunucu bilgisi alınamadı.</p>

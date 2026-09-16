@@ -1,4 +1,6 @@
 const { app, BrowserWindow, ipcMain, screen, nativeTheme } = require('electron');
+const { execFileSync, spawnSync } = require('child_process');
+const os = require('os');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -238,6 +240,73 @@ ipcMain.handle('set-performance-mode', (_event, enabled) => {
   writeDeviceConfig({ ...readDeviceConfig(), lowPerformance: enabled === true });
   console.log(`⚙️ Zayıf bilgisayar modu: ${enabled ? 'açık' : 'kapalı'} (yeniden başlatma gerekir)`);
   return { ok: true, restartRequired: true };
+});
+
+// ---------------------------------------------------------------------------
+// Windows Güvenlik Duvarı: kasa sunucusunun (port 3000) ağdan erişilebilir olması için izin kuralı
+// ---------------------------------------------------------------------------
+const FIREWALL_RULE = 'Emek Cafe Adisyon';
+
+function firewallStatus() {
+  if (process.platform !== 'win32') return { supported: false };
+  try {
+    // Tüm gelen kuralları tara: bu programa ait Engelle kuralı varsa (uyarıda "İptal" denmişse) ok=false
+    const out = execFileSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', 'name=all', 'dir=in', 'verbose'], { encoding: 'utf8', windowsHide: true, timeout: 15000, maxBuffer: 20 * 1024 * 1024 });
+    const exe = process.execPath.toLowerCase();
+    const blocks = out.split(/\r?\n(?=(?:Rule Name|Kural Ad[ıi]|Regelname)\s*:)/i);
+    let allowed = false;
+    let blocked = false;
+    let portAllowed = false;
+    for (const b of blocks) {
+      const enabled = /^(Enabled|Etkin|Aktiviert)\s*:\s*(Yes|Evet|Ja)/im.test(b);
+      if (!enabled) continue;
+      const action = (b.match(/^(Action|Eylem|Aktion)\s*:\s*(.+)$/im) || [])[2] || '';
+      const program = ((b.match(/^Program\s*:\s*(.+)$/im) || [])[1] || '').trim().toLowerCase();
+      const isAllow = /allow|izin|zulassen/i.test(action);
+      const isBlock = /block|engel|blockieren/i.test(action);
+      if (program === exe) {
+        if (isAllow) allowed = true;
+        if (isBlock) blocked = true;
+      }
+      // Bizim eklediğimiz "port 3000" kuralı (program bağımsız) da yeterlidir
+      if (isAllow && new RegExp(`^(Rule Name|Kural Ad[ıi])\\s*:\\s*${FIREWALL_RULE}\\s*$`, 'im').test(b) && /3000/.test(b)) portAllowed = true;
+    }
+    return { supported: true, allowed, blocked, ok: (allowed || portAllowed) && !blocked };
+  } catch (error) {
+    return { supported: true, allowed: false, blocked: false, ok: false, error: error.message };
+  }
+}
+
+ipcMain.handle('firewall-status', () => firewallStatus());
+
+ipcMain.handle('firewall-allow', () => {
+  if (process.platform !== 'win32') return { ok: false, error: 'Yalnızca Windows' };
+  try {
+    const exe = process.execPath;
+    // Önce bu program için yazılmış (yanlışlıkla "İptal" denmiş) engelleme kurallarını kaldır, sonra izin ver
+    const lines = [
+      '@echo off',
+      `netsh advfirewall firewall delete rule name="${FIREWALL_RULE}" >nul 2>&1`,
+      `netsh advfirewall firewall delete rule name=all dir=in program="${exe}" >nul 2>&1`,
+      `netsh advfirewall firewall add rule name="${FIREWALL_RULE}" dir=in action=allow program="${exe}" enable=yes profile=any description="Emek Cafe Adisyon kasa sunucusu - garson cihazlari ve telefonlar bu izinle baglanir"`,
+      `netsh advfirewall firewall add rule name="${FIREWALL_RULE}" dir=in action=allow protocol=TCP localport=3000 enable=yes profile=any`,
+    ];
+    const script = path.join(os.tmpdir(), 'emekcafe-firewall.cmd');
+    fs.writeFileSync(script, lines.join('\r\n') + '\r\n', 'utf8');
+    // Yönetici onayı (UAC) ister; kullanıcı onaylayınca kurallar yazılır
+    const result = spawnSync(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command', `Start-Process -FilePath cmd.exe -ArgumentList '/c','"${script}"' -Verb RunAs -Wait -WindowStyle Hidden`],
+      { windowsHide: true, timeout: 120000, encoding: 'utf8' }
+    );
+    try { fs.unlinkSync(script); } catch { /* yoksay */ }
+    if (result.status !== 0) {
+      return { ok: false, error: 'Yönetici onayı verilmedi veya işlem iptal edildi', status: firewallStatus() };
+    }
+    return { ok: true, status: firewallStatus() };
+  } catch (error) {
+    return { ok: false, error: error.message, status: firewallStatus() };
+  }
 });
 
 ipcMain.handle('relaunch-app', () => {
