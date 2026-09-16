@@ -75,6 +75,26 @@ const dbAll = (sql, params = []) =>
     db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows || [])));
   });
 
+// Tek SQLite bağlantısında iç içe BEGIN hatasını ("cannot start a transaction within a transaction")
+// önlemek için işlemler sırayla çalışır.
+let transactionChain = Promise.resolve();
+function withTransaction(fn) {
+  const job = async () => {
+    await dbRun('BEGIN');
+    try {
+      const result = await fn();
+      await dbRun('COMMIT');
+      return result;
+    } catch (err) {
+      await dbRun('ROLLBACK').catch(() => {});
+      throw err;
+    }
+  };
+  const next = transactionChain.then(job, job);
+  transactionChain = next.catch(() => {});
+  return next;
+}
+
 async function addColumnIfMissing(table, column, definition) {
   const cols = await dbAll(`PRAGMA table_info(${table})`);
   if (!cols.some((c) => c.name === column)) {
@@ -714,16 +734,11 @@ app.put(
     const validIds = sortedIds.map((id) => toInt(id));
     if (validIds.some((id) => Number.isNaN(id) || id <= 0)) return res.status(400).json({ error: 'Geçersiz kategori ID' });
 
-    await dbRun('BEGIN');
-    try {
+    await withTransaction(async () => {
       for (let i = 0; i < validIds.length; i++) {
         await dbRun(`UPDATE categories SET sortOrder = ? WHERE id = ?`, [i, validIds[i]]);
       }
-      await dbRun('COMMIT');
-    } catch (err) {
-      await dbRun('ROLLBACK').catch(() => {});
-      throw err;
-    }
+    });
     broadcast('categoriesSorted', { sortedIds: validIds });
     res.json({ success: true });
   })
@@ -809,16 +824,11 @@ app.put(
     const validIds = sortedIds.map((id) => toInt(id));
     if (validIds.some((id) => Number.isNaN(id) || id <= 0)) return res.status(400).json({ error: 'Geçersiz ürün ID' });
 
-    await dbRun('BEGIN');
-    try {
+    await withTransaction(async () => {
       for (let i = 0; i < validIds.length; i++) {
         await dbRun(`UPDATE products SET sortOrder = ? WHERE id = ? AND categoryId = ?`, [i, validIds[i], categoryId]);
       }
-      await dbRun('COMMIT');
-    } catch (err) {
-      await dbRun('ROLLBACK').catch(() => {});
-      throw err;
-    }
+    });
     broadcast('productsSorted', { categoryId, sortedIds: validIds });
     res.json({ success: true });
   })
@@ -932,32 +942,34 @@ app.post(
       return res.json({ id: result.lastID, merged: false });
     }
 
-    // Son 60 saniye içinde aynı ürün eklenmişse adedi artır (yeni satır açma)
-    const lastOrder = await dbGet(
-      `SELECT id, quantity FROM orders
-       WHERE tableId = ? AND productId = ? AND unitPrice IS NULL
-         AND (strftime('%s','now') - strftime('%s', COALESCE(updatedAt, createdAt))) <= ?
-       ORDER BY COALESCE(updatedAt, createdAt) DESC LIMIT 1`,
-      [tableId, productId, MERGE_WINDOW_SECONDS]
-    );
+    // Son 60 saniye içinde aynı ürün eklenmişse adedi artır (yeni satır açma).
+    // Okuma+yazma tek işlem içinde: aynı anda gelen tıklamalar birbirini ezmez.
+    const outcome = await withTransaction(async () => {
+      const lastOrder = await dbGet(
+        `SELECT id, quantity FROM orders
+         WHERE tableId = ? AND productId = ? AND unitPrice IS NULL
+           AND (strftime('%s','now') - strftime('%s', COALESCE(updatedAt, createdAt))) <= ?
+         ORDER BY COALESCE(updatedAt, createdAt) DESC LIMIT 1`,
+        [tableId, productId, MERGE_WINDOW_SECONDS]
+      );
+      if (lastOrder) {
+        const newQuantity = lastOrder.quantity + quantity;
+        const total = round2(product.price * newQuantity);
+        await dbRun(`UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, [newQuantity, total, lastOrder.id]);
+        return { id: lastOrder.id, merged: true, quantity: newQuantity, total };
+      }
+      const total = round2(product.price * quantity);
+      const result = await dbRun(
+        `INSERT INTO orders(tableId, productId, quantity, total, createdBy, createdByName, updatedAt) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)`,
+        [tableId, productId, quantity, total, req.user.id, req.user.displayName || req.user.username]
+      );
+      return { id: result.lastID, merged: false, quantity, total };
+    });
 
-    if (lastOrder) {
-      const newQuantity = lastOrder.quantity + quantity;
-      const total = round2(product.price * newQuantity);
-      await dbRun(`UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, [newQuantity, total, lastOrder.id]);
-      await updateTableTotal(tableId);
-      broadcast('orderUpdated', { id: lastOrder.id, quantity: newQuantity, total, tableId });
-      return res.json({ id: lastOrder.id, merged: true });
-    }
-
-    const total = round2(product.price * quantity);
-    const result = await dbRun(
-      `INSERT INTO orders(tableId, productId, quantity, total, createdBy, createdByName, updatedAt) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)`,
-      [tableId, productId, quantity, total, req.user.id, req.user.displayName || req.user.username]
-    );
     await updateTableTotal(tableId);
-    broadcast('orderCreated', { id: result.lastID, tableId, productId, quantity, total });
-    res.json({ id: result.lastID, merged: false });
+    if (outcome.merged) broadcast('orderUpdated', { id: outcome.id, quantity: outcome.quantity, total: outcome.total, tableId });
+    else broadcast('orderCreated', { id: outcome.id, tableId, productId, quantity, total: outcome.total });
+    res.json({ id: outcome.id, merged: outcome.merged });
   })
 );
 
@@ -975,8 +987,7 @@ app.post(
     const sourceOrders = await dbAll(`SELECT * FROM orders WHERE tableId = ?`, [fromTableId]);
     if (sourceOrders.length === 0) return res.status(400).json({ error: 'Kaynak masada sipariş yok' });
 
-    await dbRun('BEGIN');
-    try {
+    await withTransaction(async () => {
       const existing = await dbAll(`SELECT id, productId, quantity, unitPrice FROM orders WHERE tableId = ?`, [toTableId]);
       for (const src of sourceOrders) {
         const match = src.unitPrice == null ? existing.find((e) => e.productId === src.productId && e.unitPrice == null) : null;
@@ -992,11 +1003,7 @@ app.post(
           existing.push({ id: src.id, productId: src.productId, quantity: src.quantity, unitPrice: src.unitPrice });
         }
       }
-      await dbRun('COMMIT');
-    } catch (err) {
-      await dbRun('ROLLBACK').catch(() => {});
-      throw err;
-    }
+    });
 
     await updateTableTotal(fromTableId);
     await updateTableTotal(toTableId);
@@ -1075,27 +1082,22 @@ app.post(
     if (!sum || sum.c === 0) return res.status(400).json({ error: 'Bu masada ödenecek sipariş yok' });
     const amount = round2(sum.total || 0);
 
-    await dbRun('BEGIN');
-    let paymentId;
-    try {
+    const paymentId = await withTransaction(async () => {
       const result = await dbRun(
         `INSERT INTO payments(tableId, tableName, amount, paymentType, paidBy, paidByName) VALUES(?, ?, ?, ?, ?, ?)`,
         [tableId, table.name, amount, paymentType, req.user.id, req.user.displayName || req.user.username]
       );
-      paymentId = result.lastID;
+      const newPaymentId = result.lastID;
       await dbRun(
         `INSERT INTO payment_items(paymentId, productId, productName, quantity, price, total, orderedAt, createdBy, createdByName)
          SELECT ?, o.productId, COALESCE(p.name, 'Silinmiş ürün'), o.quantity, COALESCE(o.unitPrice, p.price, o.total / MAX(o.quantity, 1)), o.total, COALESCE(o.createdAt, CURRENT_TIMESTAMP), o.createdBy, o.createdByName
          FROM orders o LEFT JOIN products p ON p.id = o.productId WHERE o.tableId = ?`,
-        [paymentId, tableId]
+        [newPaymentId, tableId]
       );
       await dbRun(`DELETE FROM orders WHERE tableId = ?`, [tableId]);
       await dbRun(`UPDATE tables SET total = 0, status = 'boş' WHERE id = ?`, [tableId]);
-      await dbRun('COMMIT');
-    } catch (err) {
-      await dbRun('ROLLBACK').catch(() => {});
-      throw err;
-    }
+      return newPaymentId;
+    });
 
     broadcast('paymentCompleted', { tableId, amount, paymentType });
     broadcast('tableUpdated', { id: tableId, status: 'boş', total: 0 });

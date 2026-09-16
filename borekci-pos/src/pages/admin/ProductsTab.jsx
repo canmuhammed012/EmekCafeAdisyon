@@ -185,7 +185,10 @@ const SortModal = ({ open, categories, products, onClose, onSaved, showAlert }) 
       if (mode === 'categories') {
         await updateCategoriesSort(catOrder.map((c) => c.id));
       } else {
-        await Promise.all(Object.entries(prodOrder).filter(([, list]) => list.length > 0).map(([catId, list]) => updateProductsSort(Number(catId), list.map((p) => p.id))));
+        // Kategoriler sırayla kaydedilir (aynı anda gönderilirse sunucu tarafında çakışabilir)
+        for (const [catId, list] of Object.entries(prodOrder)) {
+          if (list.length > 0) await updateProductsSort(Number(catId), list.map((p) => p.id));
+        }
       }
       onSaved();
     } catch (err) {

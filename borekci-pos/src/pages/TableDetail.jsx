@@ -59,6 +59,10 @@ const TableDetail = ({ user }) => {
   const snapshotRef = useRef(null);
   const selectedCategoryRef = useRef(null);
   selectedCategoryRef.current = selectedCategory;
+  // Hızlı arka arkaya tıklamalar kaybolmasın: sipariş işlemleri sırayla kuyruğa alınır
+  const queueRef = useRef(Promise.resolve());
+  const ordersRef = useRef([]);
+  const [pending, setPending] = useState(0);
 
   const isAdmin = user?.role === 'yönetici';
 
@@ -66,6 +70,7 @@ const TableDetail = ({ user }) => {
   const loadOrders = useCallback(async () => {
     const response = await getOrders(tableId);
     const data = response.data || [];
+    ordersRef.current = data;
     setOrders(data);
     if (snapshotRef.current === null) {
       snapshotRef.current = data.map((o) => ({ id: o.id, productId: o.productId, quantity: o.quantity }));
@@ -191,6 +196,26 @@ const TableDetail = ({ user }) => {
     }
   };
 
+  /**
+   * Sipariş işlemlerini sırayla çalıştırır; hiçbir tıklama atılmaz.
+   * Her iş bittiğinde liste yenilenir, böylece bir sonraki iş güncel adetleri görür.
+   */
+  const enqueue = (fn, errorTitle = 'Hata') => {
+    setPending((n) => n + 1);
+    const job = async () => {
+      try {
+        await fn();
+        await loadOrders();
+      } catch (err) {
+        showAlert(errorTitle, getErrorMessage(err), 'error');
+      } finally {
+        setPending((n) => Math.max(0, n - 1));
+      }
+    };
+    queueRef.current = queueRef.current.then(job, job);
+    return queueRef.current;
+  };
+
   const handleAddProduct = (product) => {
     const productId = typeof product === 'object' ? product.id : product;
     setClickedProductId(productId);
@@ -200,10 +225,7 @@ const TableDetail = ({ user }) => {
       setNumPad({ open: true, product });
       return;
     }
-    run(async () => {
-      await createOrder({ tableId, productId, quantity: 1 });
-      await loadOrders();
-    }, 'Ürün eklenemedi');
+    enqueue(() => createOrder({ tableId, productId, quantity: 1 }), 'Ürün eklenemedi');
   };
 
   const handleNumPadConfirm = (amount) => {
@@ -211,10 +233,7 @@ const TableDetail = ({ user }) => {
     setNumPad({ open: false, product: null });
     if (!product) return;
     playActionSound();
-    run(async () => {
-      await createOrder({ tableId, productId: product.id, quantity: 1, customPrice: amount });
-      await loadOrders();
-    }, 'Ürün eklenemedi');
+    enqueue(() => createOrder({ tableId, productId: product.id, quantity: 1, customPrice: amount }), 'Ürün eklenemedi');
   };
 
   const toggleOrdersView = () => {
@@ -225,19 +244,21 @@ const TableDetail = ({ user }) => {
 
   const handleQuantityChange = (order, delta) => {
     playActionSound();
-    const next = order.quantity + delta;
-    run(async () => {
+    enqueue(async () => {
+      // Adet, iş çalıştığı andaki güncel değerden hesaplanır (hızlı +/+ tıklamaları doğru toplanır)
+      const current = ordersRef.current.find((o) => o.id === order.id);
+      if (!current) return; // bu arada silinmiş
+      const next = current.quantity + delta;
       if (next < 1) await deleteOrder(order.id);
       else await updateOrder(order.id, { quantity: next });
-      await loadOrders();
     }, 'Sipariş güncellenemedi');
   };
 
   const handleDeleteOrder = (order) => {
     playActionSound();
-    run(async () => {
+    enqueue(async () => {
+      if (!ordersRef.current.some((o) => o.id === order.id)) return;
       await deleteOrder(order.id);
-      await loadOrders();
     }, 'Sipariş silinemedi');
   };
 
@@ -250,6 +271,7 @@ const TableDetail = ({ user }) => {
     );
     if (!ok) return;
     run(async () => {
+      await queueRef.current; // bekleyen sipariş işlemleri bitsin
       const response = await createPayment({ tableId, paymentType: type });
       setOrdersSheetOpen(false);
       setPaymentSuccess({ type, amount: response.data?.amount ?? total });
@@ -374,7 +396,6 @@ const TableDetail = ({ user }) => {
             onClick={() => handleDeleteOrder(order)}
             className="btn btn-ghost btn-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 px-2 h-11 w-11 touch:h-12 touch:w-12 text-lg"
             title="Kalemi sil"
-            disabled={busy}
           >
             🗑
           </button>
@@ -385,7 +406,6 @@ const TableDetail = ({ user }) => {
               type="button"
               onClick={() => handleQuantityChange(order, -1)}
               className="h-11 w-12 touch:h-12 touch:w-14 font-bold text-2xl text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 active:scale-95"
-              disabled={busy}
               aria-label="Azalt"
             >
               −
@@ -395,7 +415,6 @@ const TableDetail = ({ user }) => {
               type="button"
               onClick={() => handleQuantityChange(order, +1)}
               className="h-11 w-12 touch:h-12 touch:w-14 font-bold text-2xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 active:scale-95"
-              disabled={busy}
               aria-label="Artır"
             >
               +
@@ -644,6 +663,7 @@ const TableDetail = ({ user }) => {
             <div className="flex items-center justify-between gap-1 px-2.5 pt-2 pb-1">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 truncate">
                 Sipariş <span className="text-gray-400 normal-case font-normal">· {orders.length}</span>
+                {pending > 0 && <span className="ml-1 inline-block h-3 w-3 rounded-full border-2 border-blue-500 border-t-transparent animate-spin align-middle" title="İşleniyor" />}
               </div>
               {viewToggle}
             </div>
