@@ -428,14 +428,25 @@ function naturalSort(a, b) {
   return String(a.name || '').localeCompare(String(b.name || ''), 'tr', { numeric: true, sensitivity: 'base' });
 }
 
-async function updateTableTotal(tableId) {
+/** İsteği yapan istemcinin kimliği (kendi yaptığı işlemin yayınını yoksayabilmesi için) */
+function originOf(req) {
+  const v = String(req.headers['x-client-id'] || '').slice(0, 64);
+  return /^[a-z0-9-]*$/i.test(v) ? v || null : null;
+}
+
+async function updateTableTotal(tableId, origin = null) {
   const row = await dbGet(`SELECT COUNT(*) as orderCount, SUM(total) as total FROM orders WHERE tableId = ?`, [tableId]);
   const total = round2(row?.total || 0);
   const status = (row?.orderCount || 0) > 0 ? 'dolu' : 'boş';
   await dbRun(`UPDATE tables SET total = ?, status = ? WHERE id = ?`, [total, status, tableId]);
-  broadcast('tableUpdated', { id: tableId, status, total });
+  broadcast('tableUpdated', { id: tableId, status, total, origin });
   return { total, status };
 }
+
+const ORDER_ROW_SQL = `SELECT orders.id, orders.tableId, orders.productId, products.name, COALESCE(orders.unitPrice, products.price) as price,
+       orders.unitPrice, products.variablePrice, orders.quantity, orders.total, orders.createdAt, orders.updatedAt
+  FROM orders JOIN products ON orders.productId = products.id`;
+const getOrderRow = (id) => dbGet(`${ORDER_ROW_SQL} WHERE orders.id = ?`, [id]);
 
 // ---------------------------------------------------------------------------
 // Herkese açık uçlar
@@ -937,9 +948,10 @@ app.post(
         `INSERT INTO orders(tableId, productId, quantity, total, unitPrice, createdBy, createdByName, updatedAt) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`,
         [tableId, productId, quantity, total, unitPrice, req.user.id, req.user.displayName || req.user.username]
       );
-      await updateTableTotal(tableId);
-      broadcast('orderCreated', { id: result.lastID, tableId, productId, quantity, total });
-      return res.json({ id: result.lastID, merged: false });
+      const origin = originOf(req);
+      await updateTableTotal(tableId, origin);
+      broadcast('orderCreated', { id: result.lastID, tableId, productId, quantity, total, origin });
+      return res.json({ id: result.lastID, merged: false, order: await getOrderRow(result.lastID) });
     }
 
     // Son 60 saniye içinde aynı ürün eklenmişse adedi artır (yeni satır açma).
@@ -966,10 +978,11 @@ app.post(
       return { id: result.lastID, merged: false, quantity, total };
     });
 
-    await updateTableTotal(tableId);
-    if (outcome.merged) broadcast('orderUpdated', { id: outcome.id, quantity: outcome.quantity, total: outcome.total, tableId });
-    else broadcast('orderCreated', { id: outcome.id, tableId, productId, quantity, total: outcome.total });
-    res.json({ id: outcome.id, merged: outcome.merged });
+    const origin = originOf(req);
+    await updateTableTotal(tableId, origin);
+    if (outcome.merged) broadcast('orderUpdated', { id: outcome.id, quantity: outcome.quantity, total: outcome.total, tableId, origin });
+    else broadcast('orderCreated', { id: outcome.id, tableId, productId, quantity, total: outcome.total, origin });
+    res.json({ id: outcome.id, merged: outcome.merged, order: await getOrderRow(outcome.id) });
   })
 );
 
@@ -1045,9 +1058,10 @@ app.put(
 
     const total = round2((order.unitPrice ?? product.price) * quantity);
     await dbRun(`UPDATE orders SET quantity = ?, total = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`, [quantity, total, id]);
-    await updateTableTotal(order.tableId);
-    broadcast('orderUpdated', { id, quantity, total, tableId: order.tableId });
-    res.json({ id, quantity, total });
+    const origin = originOf(req);
+    await updateTableTotal(order.tableId, origin);
+    broadcast('orderUpdated', { id, quantity, total, tableId: order.tableId, origin });
+    res.json({ id, quantity, total, order: await getOrderRow(id) });
   })
 );
 
@@ -1059,8 +1073,9 @@ app.delete(
     const order = await dbGet(`SELECT tableId FROM orders WHERE id = ?`, [id]);
     if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı' });
     await dbRun(`DELETE FROM orders WHERE id = ?`, [id]);
-    await updateTableTotal(order.tableId);
-    broadcast('orderDeleted', { id, tableId: order.tableId });
+    const origin = originOf(req);
+    await updateTableTotal(order.tableId, origin);
+    broadcast('orderDeleted', { id, tableId: order.tableId, origin });
     res.json({ success: true });
   })
 );

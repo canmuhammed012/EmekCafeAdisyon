@@ -26,6 +26,20 @@ export function getAuthToken() {
   return getStoredUser()?.token || null;
 }
 
+/** Bu sekmeye özel kimlik: sunucu yayınlarında kendi işlemimizi tanıyıp yeniden indirmeyi atlarız */
+export const CLIENT_ID = (() => {
+  try {
+    let id = sessionStorage.getItem('clientId');
+    if (!id) {
+      id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+      sessionStorage.setItem('clientId', id);
+    }
+    return id;
+  } catch {
+    return `c${Math.random().toString(36).slice(2, 12)}`;
+  }
+})();
+
 /** Oturum düştüğünde uygulamanın giriş ekranına dönmesi için */
 export const AUTH_EXPIRED_EVENT = 'emekcafe:auth-expired';
 
@@ -37,6 +51,8 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   config.baseURL = `${getServerBaseUrl()}/api`;
+  config.headers = config.headers || {};
+  config.headers['X-Client-Id'] = CLIENT_ID;
   const token = getAuthToken();
   if (token) {
     config.headers = config.headers || {};

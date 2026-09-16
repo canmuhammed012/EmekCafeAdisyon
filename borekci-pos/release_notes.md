@@ -1,3 +1,4 @@
+v2.3.5 - Masa ekranında ürün tıklamaları sipariş listesine anında yansır (iyimser güncelleme, gereksiz yeniden indirme kaldırıldı); zayıf garson bilgisayarında gecikme giderildi
 v2.3.4 - Görev çubuğunda Electron simgesi görünme sorunu: simge dosyası çok boyutlu (16-256 px) yapıldı, masaüstü kısayolu düzeltildi
 v2.3.3 - Ayarlar > Ağ bilgisi: Windows Güvenlik Duvarı izni durumu ve tek tıkla "İzin ver" düğmesi (uyarıda İptal denmişse garson cihazlarının bağlanamamasını düzeltir)
 v2.3.2 - Güncelleme "Şimdi yükle" sonrası sessiz kurulur, ek onay/sihirbaz çıkmaz; Zayıf bilgisayar modu (giriş ekranı: animasyonlar kapanır, donanım hızlandırma devre dışı); Yönetim paneli kodu (grafik/Excel) yalnızca yöneticide yüklenir, garson cihazı daha hızlı açılır; ağır animasyon ve bulanıklık efektleri kaldırıldı

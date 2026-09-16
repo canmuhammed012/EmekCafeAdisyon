@@ -14,10 +14,11 @@ import {
   requestTablePayment,
   printReceipt,
   getErrorMessage,
+  CLIENT_ID,
 } from '../services/api';
 import { getExchangeRates, convertWithDiscount, RATE_DISCOUNT } from '../services/currency';
 import { onUpdate, UPDATE_TYPES } from '../services/broadcast';
-import { formatTimeTR, formatCurrency } from '../utils/dateFormatter';
+import { formatTimeTR, formatCurrency, parseServerDate } from '../utils/dateFormatter';
 import { playActionSound } from '../utils/sound';
 import { rgba, contrastText, borderColorFor, isWhite } from '../utils/colors';
 import { useAlert } from '../hooks/useAlert';
@@ -67,6 +68,13 @@ const TableDetail = ({ user }) => {
   const isAdmin = user?.role === 'yönetici';
 
   // ---------------------------------------------------------------- yükleme
+  /** Sipariş listesini hem state'e hem ref'e yazar (kuyruk işleri güncel değeri ref'ten okur) */
+  const applyOrders = useCallback((updater) => {
+    const next = typeof updater === 'function' ? updater(ordersRef.current) : updater;
+    ordersRef.current = next;
+    setOrders(next);
+  }, []);
+
   const loadOrders = useCallback(async () => {
     const response = await getOrders(tableId);
     const data = response.data || [];
@@ -125,12 +133,15 @@ const TableDetail = ({ user }) => {
           loadProducts(selectedCategoryRef.current).catch(() => {});
           break;
         case UPDATE_TYPES.ORDERS:
+          // Kendi yaptığımız işlem zaten ekranda; yalnızca başka cihazların değişikliklerini indir
+          if (event.data?.origin === CLIENT_ID) break;
           if (!event.data || event.data.tableId === tableId || event.data.fromTableId === tableId || event.data.toTableId === tableId) {
             loadOrders().catch(() => {});
           }
           break;
         case UPDATE_TYPES.PAYMENTS:
         case UPDATE_TYPES.TABLES:
+          if (event.data?.origin === CLIENT_ID) break;
           if (!event.data || event.data.tableId === tableId || event.data.id === tableId) {
             loadOrders().catch(() => {});
             loadTable();
@@ -198,22 +209,37 @@ const TableDetail = ({ user }) => {
 
   /**
    * Sipariş işlemlerini sırayla çalıştırır; hiçbir tıklama atılmaz.
-   * Her iş bittiğinde liste yenilenir, böylece bir sonraki iş güncel adetleri görür.
+   * Ekran tıklama anında güncellenir (iyimser); sunucu cevabı gelince satır gerçek veriyle değiştirilir.
+   * Hata olursa liste sunucudan yeniden indirilir.
    */
   const enqueue = (fn, errorTitle = 'Hata') => {
     setPending((n) => n + 1);
     const job = async () => {
       try {
         await fn();
-        await loadOrders();
       } catch (err) {
         showAlert(errorTitle, getErrorMessage(err), 'error');
+        await loadOrders().catch(() => {});
       } finally {
         setPending((n) => Math.max(0, n - 1));
       }
     };
     queueRef.current = queueRef.current.then(job, job);
     return queueRef.current;
+  };
+
+  const tempIdRef = useRef(0);
+  const MERGE_WINDOW_MS = 60 * 1000;
+
+  /** Sunucudan gelen satırı listeye işle: geçici satırı veya aynı id'li satırı değiştir */
+  const mergeServerRow = (row, tempId) => {
+    if (!row) return;
+    applyOrders((list) => {
+      const withoutTemp = tempId ? list.filter((o) => o.id !== tempId) : list;
+      const exists = withoutTemp.some((o) => o.id === row.id);
+      const next = exists ? withoutTemp.map((o) => (o.id === row.id ? row : o)) : [row, ...withoutTemp];
+      return next.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)) || b.id - a.id);
+    });
   };
 
   const handleAddProduct = (product) => {
@@ -225,7 +251,27 @@ const TableDetail = ({ user }) => {
       setNumPad({ open: true, product });
       return;
     }
-    enqueue(() => createOrder({ tableId, productId, quantity: 1 }), 'Ürün eklenemedi');
+    const nowIso = new Date().toISOString();
+    // İyimser güncelleme: sunucunun 60 sn birleştirme kuralını burada da uygula
+    let tempId = null;
+    applyOrders((list) => {
+      const recent = list.find((o) => {
+        if (o.productId !== productId || o.unitPrice != null) return false;
+        const t = parseServerDate(o.updatedAt || o.createdAt);
+        return t && Date.now() - t.getTime() <= MERGE_WINDOW_MS;
+      });
+      if (recent) {
+        return list.map((o) => (o.id === recent.id ? { ...o, quantity: o.quantity + 1, total: Math.round((o.price * (o.quantity + 1)) * 100) / 100, updatedAt: nowIso, optimistic: true } : o));
+      }
+      tempId = `temp-${++tempIdRef.current}`;
+      const p = typeof product === 'object' ? product : { id: productId, name: '…', price: 0 };
+      return [{ id: tempId, tableId, productId, name: p.name, price: p.price, unitPrice: null, variablePrice: 0, quantity: 1, total: p.price, createdAt: nowIso, updatedAt: nowIso, optimistic: true }, ...list];
+    });
+    enqueue(async () => {
+      const response = await createOrder({ tableId, productId, quantity: 1 });
+      mergeServerRow(response.data?.order, tempId);
+      if (!response.data?.order) await loadOrders();
+    }, 'Ürün eklenemedi');
   };
 
   const handleNumPadConfirm = (amount) => {
@@ -233,7 +279,14 @@ const TableDetail = ({ user }) => {
     setNumPad({ open: false, product: null });
     if (!product) return;
     playActionSound();
-    enqueue(() => createOrder({ tableId, productId: product.id, quantity: 1, customPrice: amount }), 'Ürün eklenemedi');
+    const nowIso = new Date().toISOString();
+    const tempId = `temp-${++tempIdRef.current}`;
+    applyOrders((list) => [{ id: tempId, tableId, productId: product.id, name: product.name, price: amount, unitPrice: amount, variablePrice: 1, quantity: 1, total: amount, createdAt: nowIso, updatedAt: nowIso, optimistic: true }, ...list]);
+    enqueue(async () => {
+      const response = await createOrder({ tableId, productId: product.id, quantity: 1, customPrice: amount });
+      mergeServerRow(response.data?.order, tempId);
+      if (!response.data?.order) await loadOrders();
+    }, 'Ürün eklenemedi');
   };
 
   const toggleOrdersView = () => {
@@ -242,23 +295,36 @@ const TableDetail = ({ user }) => {
     localStorage.setItem('ordersView', next);
   };
 
+  const isTemp = (id) => typeof id === 'string' && id.startsWith('temp-');
+
   const handleQuantityChange = (order, delta) => {
     playActionSound();
+    // İyimser: ekranda hemen değiştir
+    applyOrders((list) => {
+      const cur = list.find((o) => o.id === order.id);
+      if (!cur) return list;
+      const q = cur.quantity + delta;
+      if (q < 1) return list.filter((o) => o.id !== order.id);
+      return list.map((o) => (o.id === order.id ? { ...o, quantity: q, total: Math.round(o.price * q * 100) / 100, optimistic: true } : o));
+    });
     enqueue(async () => {
-      // Adet, iş çalıştığı andaki güncel değerden hesaplanır (hızlı +/+ tıklamaları doğru toplanır)
+      if (isTemp(order.id)) return; // henüz sunucuda yok; bir önceki iş bittiğinde gerçek id gelir, kullanıcı tekrar dokunur
       const current = ordersRef.current.find((o) => o.id === order.id);
-      if (!current) return; // bu arada silinmiş
-      const next = current.quantity + delta;
-      if (next < 1) await deleteOrder(order.id);
-      else await updateOrder(order.id, { quantity: next });
+      if (!current) {
+        await deleteOrder(order.id).catch((e) => { if (e.response?.status !== 404) throw e; });
+        return;
+      }
+      const response = await updateOrder(order.id, { quantity: current.quantity });
+      mergeServerRow(response.data?.order);
     }, 'Sipariş güncellenemedi');
   };
 
   const handleDeleteOrder = (order) => {
     playActionSound();
+    applyOrders((list) => list.filter((o) => o.id !== order.id));
     enqueue(async () => {
-      if (!ordersRef.current.some((o) => o.id === order.id)) return;
-      await deleteOrder(order.id);
+      if (isTemp(order.id)) return;
+      await deleteOrder(order.id).catch((e) => { if (e.response?.status !== 404) throw e; });
     }, 'Sipariş silinemedi');
   };
 
