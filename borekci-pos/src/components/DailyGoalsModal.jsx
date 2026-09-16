@@ -22,13 +22,20 @@ export function useDailyGoals(enabled = true) {
   useEffect(() => {
     if (!enabled) return undefined;
     load();
+    // Art arda gelen sipariş olaylarında tek sorgu: zayıf cihazlarda gereksiz yük oluşmasın
+    let debounce = null;
+    const scheduleLoad = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(load, 1200);
+    };
     const unsubscribe = onUpdate((event) => {
-      if ([UPDATE_TYPES.GOALS, UPDATE_TYPES.ORDERS, UPDATE_TYPES.PAYMENTS, UPDATE_TYPES.PRODUCTS, UPDATE_TYPES.ALL].includes(event.type)) load();
+      if ([UPDATE_TYPES.GOALS, UPDATE_TYPES.ORDERS, UPDATE_TYPES.PAYMENTS, UPDATE_TYPES.PRODUCTS, UPDATE_TYPES.ALL].includes(event.type)) scheduleLoad();
     });
     const timer = setInterval(load, 60000);
     return () => {
       unsubscribe();
       clearInterval(timer);
+      if (debounce) clearTimeout(debounce);
     };
   }, [enabled, load]);
 
